@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# wiki pre-commit 门禁：格式/编号/手册完整性检查
+# 启用：git config core.hooksPath .githooks
+cd "$(git rev-parse --show-toplevel)"
+
+if ! command -v python >/dev/null 2>&1; then
+  echo "[pre-commit] 未找到 python 命令，跳过 wiki lint。"
+  echo "[pre-commit] 建议：安装 Python 3 并加入 PATH（引擎零依赖，无需 pip install）。"
+  exit 0
+fi
+
+if ! python .wiki/scripts/wiki.py lint; then
+  echo ""
+  echo "[pre-commit] wiki lint 未通过：修好再提交，或用 --no-verify 显式跳过（不建议）"
+  exit 1
+fi

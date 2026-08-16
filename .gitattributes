@@ -1,0 +1,9 @@
+# 脚本必须保持 LF：Windows 的 autocrlf 若转成 CRLF，git 钩子会直接失败
+*.sh        text eol=lf
+.githooks/* text eol=lf
+*.py        text eol=lf
+*.yml       text eol=lf
+
+# 文档与配置：按平台常规处理，统一 UTF-8
+*.md        text
+*.json      text
