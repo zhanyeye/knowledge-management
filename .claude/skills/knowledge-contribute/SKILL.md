@@ -27,4 +27,7 @@ description: 完成一次故障处理、技术选型、代码评审、运维操�
 ## 转正与验证
 
 - 人工确认后：`python .wiki/scripts/wiki.py promote --file pending/<文件> --to <分区>`
-- 请非作者验证：`/wiki-verify <编号> --by <人> --project <项目>`（可信度由验证驱动，不手改）
+- 请非作者验证：`/wiki-verify <编号> --by <人> --project <项目>`
+- 引用知识：`python .wiki/scripts/wiki.py reference <编号> --in "<场景>"`（写入 `.wiki/logs/refs-*.jsonl`，不改条目文件）
+
+完整契约见 [AGENTS.md](../../../AGENTS.md)。

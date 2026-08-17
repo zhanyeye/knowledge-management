@@ -10,11 +10,12 @@ allowed-tools: Bash(python .wiki/scripts/wiki.py:*), Read, Grep, Glob
 
 流程（不要遍历全库）：
 
-1. **判断任务类型**：troubleshoot（排障）/ implement（开发）/ ops_execute（执行运维手册）/ default，预算见 `.wiki/config.json` → `query_budgets`（最多读几个目录索引、几条全文）。
-2. **总目录**：读 `catalog.md` 选出最相关目录；拿不准时先跑 `python .wiki/scripts/wiki.py search $ARGUMENTS --limit 3`。
-3. **目录索引**：读选中目录的 `catalog.md`（一行一条），挑最相关的几条。
-4. **条目全文**：只读预算内的条目。`risk: high` 的手册必须先读前置检查并要求人工确认。5. **记引用**：回答中标注来源编号（如 `K8-003`），完成后执行
-   `python .wiki/scripts/wiki.py reference <命中编号> --in "$ARGUMENTS"`
+1. **空库短路**：读 `catalog.md`；若总条数为 0，直接告知空库并建议 `/wiki-import`，不要空转三级索引。
+2. **判断任务类型**：troubleshoot / implement / ops_execute / default，预算见 `.wiki/config.json` → `query_budgets`。
+3. **总目录**：读 `catalog.md` 选出最相关目录；拿不准时先跑 `python .wiki/scripts/wiki.py search $ARGUMENTS --limit 3`（检索含正文）。
+4. **目录索引**：读选中目录的 `catalog.md`（一行一条），挑最相关的几条。
+5. **条目全文**：只读预算内的条目。`risk: high` 的手册必须先读前置检查并要求人工确认。
+6. **记引用**：回答中标注来源编号，完成后执行 `python .wiki/scripts/wiki.py reference <命中编号> --in "$ARGUMENTS"`（写入 `.wiki/logs/refs-*.jsonl`，不改条目文件）。
 
 ## 输出要求
 

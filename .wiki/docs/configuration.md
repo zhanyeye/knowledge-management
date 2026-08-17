@@ -90,7 +90,7 @@ hint 会写进总目录给 Agent 看；任务类型 key 可自由增加。
 id: K8-001               # 自动生成：分区前缀-序号
 title / type / maturity  # 基础三件套（maturity 由验证驱动，不手改）
 owner / created          # 责任人与创建日期
-last_verified / last_referenced / reference_count / validations   # 引擎维护，勿手改
+last_verified / last_referenced / reference_count / validations   # 引擎维护；新引用写 refs-YYYY.jsonl，reference_count 为历史缓存
 tags: [a, b]             # 检索词（中英文均可）
 related: [其他编号]       # 关联条目（lint 校验存在性）
 risk: low|medium|high    # 仅手册类

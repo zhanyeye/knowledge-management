@@ -42,7 +42,7 @@ def load_config():
     except json.JSONDecodeError as ex:
         out(f"[wiki] 配置文件格式错误: {CONFIG_PATH.as_posix()}（第 {ex.lineno} 行第 {ex.colno} 列: {ex.msg}）")
         out("[wiki] 常见原因：多余/缺失逗号、引号未闭合、注释（JSON 不支持注释）。")
-        out("[wiki] 修复后重试；改乱了可用 git checkout -- .knowledge/config.json 恢复。")
+        out("[wiki] 修复后重试；改乱了可用 git checkout -- .wiki/config.json 恢复。")
         sys.exit(1)
 
 
@@ -88,7 +88,7 @@ def append_log(cfg, event, actor, detail):
     log_dir(cfg).mkdir(parents=True, exist_ok=True)
     path = log_file(cfg)
     if not path.exists():
-        path.write_text(f"# Wiki 操作日志 {date.today().year()}（append-only）\n格式: [日期] 事件 | 操作者 | 详情\n\n",
+        path.write_text(f"# Wiki 操作日志 {date.today().year}（append-only）\n格式: [日期] 事件 | 操作者 | 详情\n\n",
                         encoding="utf-8")
     with open(path, "a", encoding="utf-8") as f:
         f.write(f"[{today_str()}] {event} | {actor} | {detail}\n")
@@ -99,6 +99,89 @@ def os_user():
         return getpass.getuser().lower()
     except Exception:
         return "unknown"
+
+
+# 中文化与旧英文类型互通（lint / search --type 共用）
+TYPE_ALIASES = {
+    "规范": {"guideline"},
+    "guideline": {"规范"},
+    "手册": {"runbook"},
+    "runbook": {"手册"},
+}
+
+
+def type_matches(entry_type, filter_type):
+    if entry_type == filter_type:
+        return True
+    aliases = TYPE_ALIASES.get(filter_type, set())
+    return entry_type in aliases
+
+
+def is_guideline_type(entry_type):
+    return entry_type in ("guideline", "规范")
+
+
+def is_runbook_type(entry_type):
+    return entry_type in ("runbook", "手册")
+
+
+def refs_log_file(cfg, year=None):
+    year = year or date.today().year
+    return log_dir(cfg) / f"refs-{year}.jsonl"
+
+
+def load_reference_index(cfg):
+    """entry_id -> {count, last_date}，聚合全部 refs-*.jsonl"""
+    index = {}
+    d = log_dir(cfg)
+    if not d.is_dir():
+        return index
+    for path in sorted(d.glob("refs-*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            eid = rec.get("id")
+            dte = parse_date(rec.get("date"))
+            if not eid or not dte:
+                continue
+            if eid not in index:
+                index[eid] = {"count": 0, "last_date": dte}
+            index[eid]["count"] += 1
+            if dte > index[eid]["last_date"]:
+                index[eid]["last_date"] = dte
+    return index
+
+
+def reference_count(entry, ref_index):
+    legacy = int(entry.meta.get("reference_count") or 0)
+    sidecar = ref_index.get(entry.id, {}).get("count", 0) if ref_index else 0
+    return legacy + sidecar
+
+
+def entry_anchor_clock(entry, ref_index=None):
+    if ref_index and entry.id in ref_index:
+        return ref_index[entry.id]["last_date"]
+    return parse_date(entry.meta.get("last_referenced")) \
+        or parse_date(entry.meta.get("last_verified")) \
+        or parse_date(entry.meta.get("created"))
+
+
+def append_reference(cfg, entry_id, context, actor=None):
+    log_dir(cfg).mkdir(parents=True, exist_ok=True)
+    path = refs_log_file(cfg)
+    record = {
+        "date": today_str(),
+        "id": entry_id,
+        "context": context,
+        "actor": actor or os_user(),
+    }
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------- frontmatter
@@ -219,10 +302,8 @@ class Entry:
         tag_s = f" — {' '.join('#' + t for t in tags)}" if tags else ""
         return f"- **{self.id}** [{self.maturity}] ({type_title}{risk_s}) {self.title}{tag_s}"
 
-    def anchor_clock(self):
-        return parse_date(self.meta.get("last_referenced")) \
-            or parse_date(self.meta.get("last_verified")) \
-            or parse_date(self.meta.get("created"))
+    def anchor_clock(self, ref_index=None):
+        return entry_anchor_clock(self, ref_index)
 
 
 def registered_layers(cfg):
@@ -341,17 +422,32 @@ def _tokens(s):
     return words | set(cjk) | bigrams
 
 
+def _h2_headings(body):
+    return " ".join(m.group(1) for m in re.finditer(r"^##\s+(.+)$", body, re.M))
+
+
 def score_entry(entry, terms):
-    text = " ".join([entry.title, " ".join(entry.meta.get("tags") or []), entry.id,
-                     entry.type, entry.dir_rel])
-    toks = _tokens(text)
-    return sum(1 for t in terms if t in toks)
+    title_toks = _tokens(entry.title)
+    tag_toks = _tokens(" ".join(entry.meta.get("tags") or []) + " " + entry.id)
+    h2_toks = _tokens(_h2_headings(entry.body))
+    body_toks = _tokens(entry.body)
+    score = 0
+    for t in terms:
+        if t in title_toks:
+            score += 4
+        if t in tag_toks:
+            score += 3
+        if t in h2_toks:
+            score += 2
+        if t in body_toks:
+            score += 1
+    return score
 
 
 def cmd_search(cfg, args):
     entries = load_entries(cfg)
     if args.type:
-        entries = [e for e in entries if e.type == args.type]
+        entries = [e for e in entries if type_matches(e.type, args.type)]
     if args.maturity:
         entries = [e for e in entries if e.maturity == args.maturity]
     if args.risk:
@@ -369,7 +465,7 @@ def cmd_search(cfg, args):
         for s, e in hits[: args.full]:
             out("\n" + "=" * 60)
             out(f"# {e.id} {e.title}")
-            out((dump_frontmatter(e.meta) + "\n" + e.body).strip()[:4000])
+            out((dump_frontmatter(e.meta) + "\n" + e.body).strip())
     if args.reference:
         _do_reference(cfg, [e.id for _, e in hits], args.reference)
 
@@ -381,16 +477,18 @@ def find_entry(entries, entry_id):
 
 
 def _do_reference(cfg, ids, context):
+    ref_index = load_reference_index(cfg)
     for entry_id in ids:
         entries = load_entries(cfg)
         e = find_entry(entries, entry_id)
         if not e:
             out(f"[wiki] 未找到 {entry_id}")
             continue
-        e.meta["last_referenced"] = today_str()
-        e.meta["reference_count"] = int(e.meta.get("reference_count") or 0) + 1
-        save_entry(e)
-        out(f"[wiki] 已记录引用: {entry_id} (累计 {e.meta['reference_count']} 次, 上下文: {context})")
+        append_reference(cfg, entry_id, context)
+        ref_index = load_reference_index(cfg)
+        total = reference_count(e, ref_index)
+        out(f"[wiki] 已记录引用: {entry_id} (累计 {total} 次, 上下文: {context})")
+        append_log(cfg, "reference", os_user(), f"{entry_id} context={context}")
 
 
 def cmd_reference(cfg, args):
@@ -436,10 +534,11 @@ def cmd_decay(cfg, args):
     dcfg = cfg["maturity"]["decay"]
     today = date.today()
     actions = []
+    ref_index = load_reference_index(cfg)
     for e in load_entries(cfg):
         if dcfg.get("evergreen_exempt") and e.meta.get("evergreen"):
             continue  # evergreen 条目豁免衰减（如核心红线/基础操作）
-        clock = e.anchor_clock()
+        clock = e.anchor_clock(ref_index)
         if not clock:
             continue
         months = months_between(clock, today)
@@ -450,7 +549,7 @@ def cmd_decay(cfg, args):
             e.meta["maturity"] = "draft"
             actions.append(f"{e.id} verified→draft (闲置 {months} 月)")
         elif (e.maturity == "draft" and months >= dcfg["archive_draft_months"]
-              and not validations_of(e) and not int(e.meta.get("reference_count") or 0)):
+              and not validations_of(e) and reference_count(e, ref_index) == 0):
             arc = ROOT / cfg["paths"]["archive"] / str(today.year)
             arc.mkdir(parents=True, exist_ok=True)
             new_path = arc / e.path.name
@@ -478,6 +577,30 @@ def _title_jaccard(t1, t2):
     return len(s1 & s2) / len(s1 | s2)
 
 
+def find_guideline_conflicts(entries, jaccard_threshold=0.3):
+    """全库相反规范冲突：按 tag 聚类（跨分区），供 lint 与单测共用"""
+    by_tag = {}
+    for e in entries:
+        if is_guideline_type(e.type):
+            for t in set(e.meta.get("tags") or []):
+                by_tag.setdefault(t, []).append(e)
+    conflicts, seen_pairs = [], set()
+    for tag, es in by_tag.items():
+        for i in range(len(es)):
+            for j in range(i + 1, len(es)):
+                a, b = es[i], es[j]
+                pair = tuple(sorted((a.id, b.id)))
+                if pair in seen_pairs:
+                    continue
+                if a.meta.get("polarity") and b.meta.get("polarity") \
+                        and a.meta["polarity"] != b.meta["polarity"] \
+                        and _title_jaccard(a.title, b.title) >= jaccard_threshold:
+                    seen_pairs.add(pair)
+                    conflicts.append(f"{a.id}({a.meta['polarity']}) vs {b.id}({b.meta['polarity']}) — "
+                                     f"{a.title} / {b.title}（#{tag}）")
+    return conflicts
+
+
 def cmd_lint(cfg, args):
     entries = load_entries(cfg)
     issues, warnings, autofixed = [], [], []
@@ -485,6 +608,7 @@ def cmd_lint(cfg, args):
     levels = set(cfg["maturity"]["levels"])
     layer_meta = dict(layers_in_config_order(cfg))
     all_ids = {e.id for e in entries}
+    ref_index = load_reference_index(cfg)
 
     for e in entries:
         m = e.meta
@@ -501,18 +625,18 @@ def cmd_lint(cfg, args):
         for rid in m.get("related") or []:
             if rid not in all_ids:
                 issues.append(f"{e.id}: related 指向不存在的 {rid}")
-        if m.get("type") in ("runbook", "手册"):
+        if is_runbook_type(m.get("type")):
             if not m.get("risk"):
                 issues.append(f"{e.id}: 手册类必须声明 risk(low/medium/high)")
             for sec in cfg["lint"]["runbook_requires"]:
                 if sec not in e.body:
                     issues.append(f"{e.id}: 手册类缺少「{sec}」章节")
-        if m.get("type") in ("guideline", "规范"):
+        if is_guideline_type(m.get("type")):
             if m.get("polarity") not in cfg["lint"]["guideline_polarity_values"]:
                 issues.append(f"{e.id}: 规范类需 polarity: recommend|avoid")
             if "理由" not in e.body and "reason" not in e.body.lower():
                 warnings.append(f"{e.id}: 规范类建议写明理由")
-        clock = e.anchor_clock()
+        clock = e.anchor_clock(ref_index)
         if clock and e.maturity == "draft":
             months = months_between(clock, date.today())
             if months >= cfg["maturity"]["decay"]["archive_draft_months"]:
@@ -524,26 +648,7 @@ def cmd_lint(cfg, args):
             issues.append(f"重复编号: {e.id} ({seen[e.id]} 与 {e.path})")
         seen[e.id] = e.path
 
-    # 全库相反规范冲突：按 tag 聚类配对（跨分区也能查出），同对去重
-    by_tag = {}
-    for e in entries:
-        if e.type == "guideline":
-            for t in set(e.meta.get("tags") or []):
-                by_tag.setdefault(t, []).append(e)
-    conflicts, seen_pairs = [], set()
-    for tag, es in by_tag.items():
-        for i in range(len(es)):
-            for j in range(i + 1, len(es)):
-                a, b = es[i], es[j]
-                pair = tuple(sorted((a.id, b.id)))
-                if pair in seen_pairs:
-                    continue
-                if a.meta.get("polarity") and b.meta.get("polarity") \
-                        and a.meta["polarity"] != b.meta["polarity"] \
-                        and _title_jaccard(a.title, b.title) >= 0.3:
-                    seen_pairs.add(pair)
-                    conflicts.append(f"{a.id}({a.meta['polarity']}) vs {b.id}({b.meta['polarity']}) — "
-                                     f"{a.title} / {b.title}（#{tag}）")
+    conflicts = find_guideline_conflicts(entries)
     if conflicts:
         pdir = ROOT / cfg["paths"]["pending"]
         pdir.mkdir(parents=True, exist_ok=True)
@@ -654,6 +759,7 @@ def cmd_stats(cfg, args):
     if not entries:
         out("[wiki] 知识库为空")
         return
+    ref_index = load_reference_index(cfg)
     levels = cfg["maturity"]["levels"]
     out(f"=== Wiki 体检 ({today_str()}) ===  总条数: {len(entries)}")
     out("\n按成熟度:")
@@ -666,10 +772,10 @@ def cmd_stats(cfg, args):
         if es:
             counts = ", ".join(f"{lv}:{sum(1 for e in es if e.maturity == lv)}" for lv in levels)
             out(f"  {path_key:<20} {len(es):>3}  ({counts})")
-    top = sorted(entries, key=lambda e: -int(e.meta.get("reference_count") or 0))[:5]
+    top = sorted(entries, key=lambda e: -reference_count(e, ref_index))[:5]
     out("\nTop 引用:")
     for e in top:
-        out(f"  {e.id}: {e.meta.get('reference_count') or 0} 次 — {e.title}")
+        out(f"  {e.id}: {reference_count(e, ref_index)} 次 — {e.title}")
     verified_cnt = sum(1 for e in entries if parse_date(e.meta.get("last_verified")))
     out(f"\n验证覆盖率: {verified_cnt}/{len(entries)} ({verified_cnt * 100 // len(entries)}%)")
 
@@ -689,7 +795,7 @@ def cmd_init(cfg, args):
     log_dir(cfg).mkdir(parents=True, exist_ok=True)
     if not log_file(cfg).exists():
         log_file(cfg).write_text(
-            f"# Wiki 操作日志 {date.today().year()}（append-only）\n格式: [日期] 事件 | 操作者 | 详情\n\n"
+            f"# Wiki 操作日志 {date.today().year}（append-only）\n格式: [日期] 事件 | 操作者 | 详情\n\n"
             f"[{today_str()}] init | system | 初始化\n", encoding="utf-8")
         created.append(log_file(cfg).as_posix())
     out(f"[wiki] init 完成，新建 {len(created)} 项" + (": " + ", ".join(created) if created else "（结构已就绪）"))
