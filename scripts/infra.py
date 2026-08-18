@@ -565,7 +565,8 @@ def cmd_index(cfg, args):
         es = by_domain.get(prefix, [])
         ac = "/".join(str(sum(1 for e in es if e.automation == lv)) for lv in auto_levels)
         mc = "/".join(str(sum(1 for e in es if e.maturity == lv)) for lv in levels)
-        a.append(f"| {dmeta['title']} | [{prefix}/]({prefix}/INDEX.md) | {len(es)} | {ac} | {mc} |")
+        path_cell = f"[{prefix}/]({prefix}/INDEX.md)" if es else f"{prefix}/"
+        a.append(f"| {dmeta['title']} | {path_cell} | {len(es)} | {ac} | {mc} |")
     a += ["", "## 按任务类型的查询预算", ""]
     for task, b in cfg["budgets"].items():
         a.append(f"- **{task}**: {b.get('hint', '')}（目录≤{b.get('dirs', 2)}，全文≤{b.get('full', 5)}）")
