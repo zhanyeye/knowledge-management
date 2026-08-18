@@ -1,0 +1,32 @@
+# 域资源台账：一域一份（knowledge/<NN-域>/inventory.yaml），一文件多资源。
+# 只写「事实」：在哪/谁负责/入口/依赖；操作与决策分别放 runbook/adr。
+# lint 必填：resource_type/name/env/owner/entrypoints；last_reviewed 超 90 天告警。
+resources:
+  - resource_type: ""        # cluster|database|middleware|domain|certificate|storage|platform|service|vm
+    name: ""
+    display_name: ""
+    env: ""                  # dev|test|prod
+    criticality: medium      # low|medium|high|critical
+    owner:
+      team: ""
+      primary: ""
+      escalation: ""
+    location:
+      network_zone: ""       # 黄区|绿区|通用区
+      cluster: ""
+      namespace: ""
+      hostnames: []
+    entrypoints:
+      console: ""
+      dashboard: ""
+      logs: ""
+      repo: ""
+    dependencies:
+      upstream: []
+      downstream: []
+    knowledge:                # 跨文件关联唯一源（lint 校验存在）
+      runbooks: []
+      playbooks: []
+      faqs: []
+    last_reviewed: ""
+    tags: []

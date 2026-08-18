@@ -1,79 +1,87 @@
-# AGENTS.md — 基础设施知识库协作契约
+# AGENTS.md — 基础设施知识库协作契约（方案D域制）
 
-本仓库是基础设施团队知识库：Markdown/YAML 知识 + `scripts/infra.py` 引擎（纯标准库，零依赖）+ `.claude/skills/` 任务型自动化。
-适用于 Claude Code / ZCode / Cursor / 其他 CLI Agent。**本文件是唯一契约**，不要再建 .cursor/.claude 命令副本。
+本仓库 = 知识库（`knowledge/` 按域组织）+ 自动化脚本（`scripts/` + manifest 注册表）+ 技能层（`.claude/skills/`）。
+引擎 `scripts/infra.py`（纯标准库，零依赖）。适用于 Claude Code / ZCode / Cursor / 其他 CLI Agent。
+**本文件是唯一契约**，不要再建 .cursor/.claude 命令副本。
 
-## 一、动手前先查（三级索引 + 查询预算）
-
-任何排障 / 变更 / 定位 / 咨询任务，先按索引检索，禁止 grep 全库：
-
-1. 读 `INDEX.md`（总索引）；若全库为空，直接告知并建议走 infra-import 导入
-2. 读目标分区的 `INDEX.md`（一行一条）
-3. 按预算读条目全文（预算在 `scripts/infra.json` → `budgets`，按任务类型）
-
-辅助定位：`python scripts/infra.py search <关键词> --limit 3`（标题/标签/H2/正文加权，含草稿箱）。
-
-**命中并使用知识后必须记引用**：`python scripts/infra.py reference <相对路径> --in "<上下文>"`。
-引用写 `.infra/refs-YYYY.jsonl` 侧车日志，不改条目；无引用的手册会被 decay 降级归档。
-
-## 二、什么放哪里（七类判定表）
-
-| 问题 | kind | 放哪 | 反例 |
-|---|---|---|---|
-| 这个东西在哪/谁负责/入口是啥 | registry | `台账/<对象类型>/<名称>.yaml`（集群/数据库/中间件/域名/证书/存储/观测/平台/服务/虚机） | 不要在 md 里堆资产清单 |
-| 这件事怎么做/怎么回滚 | runbook | `手册/<域>/<名称>.md`（域：k8s/网络/域名/证书/虚机/发布/数据库/观测/平台） | 按动作组织，不按组件 |
-| 这个症状怎么查 | playbook | `排障/<名称>.md`（如 磁盘满/微服务重启分析/Helm部署失败） | 按症状组织，不按组件 |
-| 为什么这样设计 | adr | `决策/NNNN-<名称>.md`，编号连续 | — |
-| 高频短问答 | faq | `问答/<域>.md` | 长流程放手册 |
-| 链路/拓扑/数据流 | architecture | `架构/{拓扑,请求链路,数据流}/` | 必须带 mermaid |
-| 真实故障复盘 | case | `案例/<年>/` | 只写有复盘价值的故障 |
-
-命名：**目录与文件名用中文**（产品名/命令保留英文，如 MinIO容量告急.md、node-agent灰度发版.md）；
-frontmatter 的 `kind` 用英文标识（registry/runbook/playbook/adr/faq/architecture/case）。文件路径即 ID。
-
-## 三、写入规则（唯一写入口是 草稿箱/）
-
-1. 新知识（无论 AI 导入还是人写）先落 `草稿箱/`：`python scripts/infra.py new <kind> <名称> --title "<中文标题>"`
-2. 套 `templates/<kind>` 模板补内容；**禁止编造**：原始材料没有的信息写 `TODO`，不确定的命令参数标 `待确认`
-3. 涉及具体资源对象的，同步补/更新对应 `台账/*.yaml` 的 `knowledge.*` 链接（跨文件关联唯一源）
-4. 跑 `python scripts/infra.py lint` 必须零错误
-5. 人工 review 后转正：`git mv 草稿箱/<文件> <目标分区>/` → `python scripts/infra.py index` → 提交
-
-## 四、运维执行安全（risk 分级）
-
-执行手册/排障条目前完整读全文，按 frontmatter `risk` 分级：
-
-- **low**：只读诊断（kubectl get/describe/logs/top、df、看面板）可直接执行
-- **medium**：有变更效果（重启、清理、改配置）——展示步骤清单，逐项人工确认后执行
-- **high**：生产高危（证书切换、批量主机操作、数据删除、核心组件发版）——只输出人工执行指引，Agent 不代跑；分步执行、每步验证后收尾
-
-条目未标 risk 的按 high 处理。没有手册的 high 风险操作，先推动沉淀手册再执行。
-
-## 五、治理
-
-- 成熟度：draft（未确认）→ verified（owner/非作者确认，`infra.py verify <路径>`）→ proven（实战检验，`--proven`）
-- 衰减：手册/排障 6 个月无引用/复审信号自动降级；draft 归档需 `decay --fix`；台账豁免（靠 last_reviewed 90 天 lint 告警）
-- 治理动作：`python scripts/infra.py {index,search,lint,decay}`，lint 错误清零才能提交
-- 归档/ 可逆：git mv 回来即可
-
-## 六、任务入口（.claude/skills/，ZCode/Claude Code 自动加载）
-
-| 场景 | skill |
-|---|---|
-| 「XX 在哪/谁负责/入口」 | infra-locate |
-| 「我要做 XX（配域名/换证书/扩容…）」 | infra-change |
-| 「XX 出问题了 / XX 症状」 | infra-troubleshoot |
-| 「把这批文档/场景整理入库」 | infra-import |
-| 引擎直调 | `python scripts/infra.py {index,search,lint,decay,reference,verify,new}` |
-
-## 七、目录
+## 一、路由中枢（遇到问题先走这里）
 
 ```
-INDEX.md   总索引（自动生成）   台账/     资产台账（YAML）
-手册/      操作手册（按动作）   排障/     排障手册（按症状）
-决策/      决策记录           问答/     高频问答
-架构/      拓扑/链路（mermaid） 案例/     故障复盘（按年）
-草稿箱/    新知识唯一写入口     归档/     衰减归档（可逆）
-templates/ 七套模板           scripts/  infra.py + infra.json + 测试
-.infra/    refs-*.jsonl 引用旁车 + 操作日志    .background/ 设计资料（不参与索引）
+排障（"XX 出问题了/XX 症状"）：
+  读 问题定位索引.md（症状→域→文档→脚本→skill）→ 有原子 skill 用 skill
+  → 无则读域内 问题定位/ 文档 → 仍无则 search/INDEX 逐级查 → 事后沉淀
+
+定位（"XX 在哪/谁负责/入口"）：
+  查 域路由表.yaml 定位域 → 读 knowledge/<域>/inventory.yaml
+
+变更（"我要做 XX"）：
+  search --kind runbook / 域 INDEX → 完整读手册 → 按「三层闸门」执行
+
+入库（"把这份笔记/文档整理进库"）：
+  infra-import 流程（见 skill）：分类 → new 生成 → 填内容（禁编造，缺项 TODO）→ lint
+```
+
+索引三级：`INDEX.md`（总）→ `knowledge/<NN-域>/INDEX.md`（域）→ 条目全文。
+预算按任务类型在 `scripts/infra.json` → `budgets`。
+辅助：`python scripts/infra.py search <关键词> --limit 3`（标题/标签/H2/正文加权）。
+
+## 二、什么放哪里（11 域 × 8 类）
+
+域：`00-通用环境基线 01-镜像制作 02-k8s资源管理 03-构建资源管理 04-网络管理 05-数据库 06-存储 07-消息中间件 08-数据工程与AI平台 09-业务平台对接 10-研发效能与协同`（键名见 域路由表.yaml，agent 寻址不靠记编号）
+
+| kind | 放哪 | 说明 |
+|---|---|---|
+| registry | `knowledge/<域>/inventory.yaml` | 每域一份多资源台账（在哪/谁负责/入口/依赖） |
+| runbook | `knowledge/<域>/**`（含子目录） | 操作手册：怎么做/怎么回滚，带前置/验证/回滚 |
+| playbook | `knowledge/<域>/问题定位/` | 排障手册：按症状组织，标 `symptoms` 进症状索引 |
+| case | `knowledge/<域>/复盘/` | 故障/改进复盘 |
+| adr | `knowledge/<域>/方案设计/` | 决策/RFC——**明确非可执行**，agent 不得当步骤执行 |
+| reference | `knowledge/<域>/` 顶层 | 基线/约定：只写内部与通用标准的不同处 |
+| faq / architecture | `knowledge/<域>/faq*.md` / `architecture*.md` | 问答 / 链路图（必带 mermaid） |
+
+命名：目录英文+序号，文件名中文（产品名保留英文）。路径即 ID。
+
+## 三、写入规则（直接写目标位置，git 即评审）
+
+1. `python scripts/infra.py new <kind> <名> --domain <域键>` 生成骨架（maturity=draft）
+2. 套模板补内容；**禁止编造**：原始材料没有的信息写 `TODO`，不确定命令标 `待确认`
+3. playbook 标 `symptoms`（进问题定位索引）；配了脚本标 `script`（必须已登记 manifest）
+4. 涉及资源对象 → 同步 `inventory.yaml` 的 `knowledge.*` 链接（跨文件关联唯一源）
+5. `python scripts/infra.py lint` 零错误 → commit（git diff/PR 即人审）→ `index` 刷新索引
+
+## 四、执行安全（三层闸门）
+
+agent 执行任何动作前依次过：
+
+1. **脚本在 `scripts/manifest.yaml` 里吗？** 不在 → 不允许凭空跑
+2. **manifest 的 risk_level？** `readonly` → 可直接执行（只读诊断）
+3. **`change` → 查 related_doc 手册的 risk**：medium 逐项确认后执行；high 只输出人工指引
+
+手册未标 risk 按 high 处理；没有手册的 high 风险操作，先沉淀手册再执行。
+原子 skill 编写规范见 `设计方案/方案D-合并版-知识Skill化与自动化.md` 第十节（单一职责/只读优先/change 必带 dry-run/登记才可执行/知识不搬家/留痕闭环）。
+
+## 五、自动化四级（知识 skill 化的推进仪表盘）
+
+`L0 文档 → L1 脚本化(manifest 登记) → L2 skill 化(SKILL.md+脚本+判读) → L3 自动化(CI 触发)`
+frontmatter 标 `automation`，INDEX.md 展示各域分布。不强求全 L3，高频/高危优先。
+连续 3 次零人工干预跑通可申报 L3。执行留痕：结论写 `reports/YYYY-MM-<主题>.md`。
+
+## 六、治理
+
+- 成熟度：draft → verified（`infra.py verify <路径>`）→ proven（`--proven`，实战检验）
+- 衰减：手册/排障 6 个月无引用/复审信号自动降级；draft 闲置由 decay 报「建议删除」（人工 git rm，历史可恢复）；台账走 last_reviewed 90 天告警
+- **命中并使用知识必须记引用**：`python scripts/infra.py reference <路径> --in "<上下文>"`
+- CI（.github/workflows/lint.yml）：lint + 单测，错误清零才能合入
+
+## 七、命令与目录
+
+```
+python scripts/infra.py {index,search,lint,decay,reference,verify,new}
+
+任务入口（.claude/skills/）：infra-locate / infra-change / infra-troubleshoot / infra-import
+原子技能（.claude/skills/<域>/<名>/）：如 storage/disk-usage-diagnose
+
+INDEX.md 总索引          问题定位索引.md 症状路由     域路由表.yaml agent寻址
+knowledge/ 知识库（11域） scripts/ 引擎+脚本+manifest  templates/ 模板
+reports/ 执行留痕        .infra/ 引用旁车+日志        .background/ .设计方案/ 设计资料
 ```

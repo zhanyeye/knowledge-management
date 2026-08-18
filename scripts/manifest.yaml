@@ -1,0 +1,36 @@
+# 脚本注册表 —— 自动化主干（方案D三层闸门的数据源）
+# 规则：
+#   risk_level: readonly → agent 可直接执行（只读诊断）
+#   risk_level: change   → 必须支持 --dry-run，且按 related_doc 的 risk 分级执行
+#   未登记的脚本一律不许执行。lint 校验本表与文件/文档链接一致性。
+- name: disk_usage_scan
+  domain: storage
+  path: scripts/storage/disk_usage_scan.sh
+  description: 分层扫描目录找出磁盘/inode 占用（只读）
+  risk_level: readonly
+  entry_command: "bash scripts/storage/disk_usage_scan.sh <host> --quick"
+  related_doc: knowledge/06-存储/问题定位/px公共文件服务器满.md
+
+- name: find_workload_location
+  domain: k8s
+  path: scripts/k8s/find_workload_location.sh
+  description: 按服务名跨命名空间定位 K8s 工作负载（只读）
+  risk_level: readonly
+  entry_command: "bash scripts/k8s/find_workload_location.sh <服务名>"
+  related_doc: knowledge/02-k8s资源管理/定位服务部署位置.md
+
+- name: diagnose_pod_oom
+  domain: k8s
+  path: scripts/k8s/diagnose_pod_oom.sh
+  description: Pod 重启/OOM 只读诊断（事件+上次日志+dmesg 线索）
+  risk_level: readonly
+  entry_command: "bash scripts/k8s/diagnose_pod_oom.sh <pod名> [-n 命名空间]"
+  related_doc: knowledge/02-k8s资源管理/问题定位/微服务重启分析.md
+
+- name: px_queue_check
+  domain: build
+  path: scripts/build/px_queue_check.sh
+  description: CI 任务排队/Job 阻塞画像（只读，kubectl 层面）
+  risk_level: readonly
+  entry_command: "bash scripts/build/px_queue_check.sh [-n 命名空间]"
+  related_doc: knowledge/03-构建资源管理/问题定位/CI任务排队堆积.md

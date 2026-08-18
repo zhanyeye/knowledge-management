@@ -1,18 +1,30 @@
 {
-  "version": 1,
-  "note": "查询预算/衰减阈值/lint 规则。低频手改本文件即可，引擎零依赖纯标准库。",
+  "version": 2,
+  "note": "方案D域制结构。域清单驱动 index 生成域路由表/问题定位索引；预算/阈值/lint 规则。",
+  "domains": {
+    "base":    {"path": "knowledge/00-通用环境基线", "title": "通用环境基线"},
+    "image":   {"path": "knowledge/01-镜像制作", "title": "镜像制作"},
+    "k8s":     {"path": "knowledge/02-k8s资源管理", "title": "K8s资源管理"},
+    "build":   {"path": "knowledge/03-构建资源管理", "title": "构建资源管理"},
+    "network": {"path": "knowledge/04-网络管理", "title": "网络管理"},
+    "db":      {"path": "knowledge/05-数据库", "title": "数据库"},
+    "storage": {"path": "knowledge/06-存储", "title": "存储"},
+    "mq":      {"path": "knowledge/07-消息中间件", "title": "消息中间件"},
+    "dataai":  {"path": "knowledge/08-数据工程与AI平台", "title": "数据工程与AI平台"},
+    "biz":     {"path": "knowledge/09-业务平台对接", "title": "业务平台对接"},
+    "devex":   {"path": "knowledge/10-研发效能与协同", "title": "研发效能与协同"}
+  },
+  "automation_levels": ["L0", "L1", "L2", "L3"],
   "budgets": {
-    "troubleshoot": { "dirs": 2, "full": 3, "hint": "排障：先查 playbook，再查 registry 定位资源" },
-    "ops_execute": { "dirs": 1, "full": 1, "hint": "执行手册：完整读目标 runbook；risk=high 必须人工逐项确认" },
-    "locate": { "dirs": 2, "full": 2, "hint": "资源定位：以 registry 台账为主" },
+    "troubleshoot": { "dirs": 2, "full": 3, "hint": "排障：先读 问题定位索引.md，再进域内 问题定位/；readonly 脚本可直接跑" },
+    "ops_execute": { "dirs": 1, "full": 1, "hint": "执行手册：完整读目标文档；change 脚本按 risk 分级，high 只出人工指引" },
+    "locate": { "dirs": 2, "full": 2, "hint": "资源定位：查 knowledge/<域>/inventory.yaml" },
     "default": { "dirs": 2, "full": 5, "hint": "默认预算" }
   },
   "maturity": { "levels": ["draft", "verified", "proven"] },
   "decay": {
     "proven_months": 12,
-    "demote_verified_months": 6,
-    "archive_draft_months": 6,
-    "registry_exempt": true
+    "demote_verified_months": 6
   },
   "lint": {
     "runbook_requires": ["前置条件", "操作步骤", "验证", "回滚"],
@@ -21,8 +33,18 @@
     "case_requires": ["现象", "根因", "改进"],
     "faq_requires": ["Q1"],
     "architecture_requires": ["mermaid"],
-    "kinds_requiring_risk": ["runbook", "playbook"],
-    "registry_required": ["resource_type", "name", "env", "owner", "entrypoints", "knowledge"],
-    "registry_review_days": 90
+    "risk_kinds": ["runbook", "playbook"],
+    "automation_kinds": ["runbook", "playbook"],
+    "registry_required": ["resource_type", "name", "env", "owner", "entrypoints"],
+    "registry_review_days": 90,
+    "manifest_risk_levels": ["readonly", "change"]
+  },
+  "paths": {
+    "knowledge": "knowledge",
+    "manifest": "scripts/manifest.yaml",
+    "symptom_index": "问题定位索引.md",
+    "domain_routes": "域路由表.yaml",
+    "reports": "reports",
+    "skills": ".claude/skills"
   }
 }

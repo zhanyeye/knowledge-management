@@ -4,6 +4,10 @@ owner: ""
 kind: playbook
 maturity: draft
 risk: low
+automation: L0
+symptoms: []
+script: null
+skill: null
 tags: []
 related: []
 created: ""
@@ -40,5 +44,5 @@ last_reviewed: null
 - 出现什么情况应停止自查、找谁（owner / 值班 / 升级链）：
 
 ## 关联
-- registry（涉及资源）：
+- inventory（涉及资源）：
 - 相关 runbook / 案例：

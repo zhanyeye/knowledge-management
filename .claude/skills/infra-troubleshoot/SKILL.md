@@ -1,6 +1,6 @@
 ---
 name: infra-troubleshoot
-description: 基础设施故障排查。当用户描述症状/异常时使用：磁盘满、OOM、Pod CrashLoop/Pending、502/504、超时、慢查询、指标/日志/trace 缺失、发布失败、队列堆积等。查 playbook 按排查树定位。
+description: 基础设施故障排查。当用户描述症状/异常时使用：磁盘满、OOM、Pod CrashLoop/Pending、502/504、超时、慢查询、指标/日志/trace 缺失、发布失败、队列堆积等。先查问题定位索引，按排查路径执行，结论写 reports/。
 ---
 
 # infra-troubleshoot — 故障排查
@@ -9,21 +9,18 @@ description: 基础设施故障排查。当用户描述症状/异常时使用：
 
 ## 流程
 
-1. 提取症状关键词，找排障手册：
-   ```bash
-   python scripts/infra.py search <症状关键词> --kind playbook --limit 3   # 结果在 排障/
-   ```
-2. **完整读命中的 playbook**（预算 ≤3 条），按排查路径顺序执行：
-   - 只读诊断命令（kubectl get/describe/logs/events、top、df、du、看面板/日志检索）视为 **low，直接执行**并汇报判读结果；
-   - 变更类动作（delete/restart/清理/改配置）按其所属 runbook 的 risk 分级处理（medium 逐项确认、high 只出指引）。
-3. 涉及具体资源用 `infra-locate` 定位（哪个集群/实例/入口）。
-4. 命中根因并解决 → 收尾；排查树走完未解决 → 见「升级」。
+1. **先读 问题定位索引.md**（根目录，症状→域→文档→脚本→skill）：
+   - 命中且有 skill → 直接用该 skill（如 storage/disk-usage-diagnose）
+   - 命中有脚本（manifest risk_level: readonly）→ 直接跑脚本拿画像
+2. 索引未命中：`python scripts/infra.py search <症状关键词> --kind playbook --limit 3`
+3. **完整读命中的问题定位文档**（预算 ≤3 条），按排查路径顺序执行；
+   涉及资源用 infra-locate 查 inventory。
+4. 变更类动作（delete/restart/清理）按 infra-change 的三层闸门——排障中也不豁免。
+5. 排查树走完未解决 → 见文档「升级条件」；没写的报告已排除路径+当前证据，找资源 owner。
 
-## 升级
+## 收尾（三件事）
 
-playbook 的「升级条件」节指明何时停止自查、找谁。没有写明的：报告已排除的路径 + 当前证据，建议联系资源 owner（查 registry）。
-
-## 收尾（两件事）
-
-1. `python scripts/infra.py reference <playbook路径> --in "<故障简述>"`；
-2. 本次走了新路径/发现手册没覆盖的根因 → 用 infra-import 流程把这次的排查步骤补进 playbook 或沉淀新 playbook/case。**排障经验不沉淀，下次还得从零查。**
+1. `python scripts/infra.py reference <文档路径> --in "<故障简述>"`
+2. 结论写 `reports/YYYY-MM-<主题>.md`：现象/排查路径/根因/处置/遗留
+3. 走了新路径或发现手册没覆盖的根因 → 直接把这次的排查步骤补进对应 问题定位/ 文档
+   （标 symptoms），或沉淀新 playbook/复盘。**经验不沉淀，下次从零查。**

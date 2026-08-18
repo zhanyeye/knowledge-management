@@ -17,7 +17,7 @@ last_reviewed: null
 **A：**
 - 直接结论：
 - 补充说明：
-- 参考：`排障/...` / `台账/...`
+- 参考：`knowledge/<域>/问题定位/...` / `knowledge/<域>/inventory.yaml`
 
 ## Q2：<问题标题>
 **A：**

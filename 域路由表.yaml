@@ -1,0 +1,13 @@
+# 自动生成（infra.py index），勿手改。agent 寻址优先查本表。
+domains:
+  base: knowledge/00-通用环境基线
+  image: knowledge/01-镜像制作
+  k8s: knowledge/02-k8s资源管理
+  build: knowledge/03-构建资源管理
+  network: knowledge/04-网络管理
+  db: knowledge/05-数据库
+  storage: knowledge/06-存储
+  mq: knowledge/07-消息中间件
+  dataai: knowledge/08-数据工程与AI平台
+  biz: knowledge/09-业务平台对接
+  devex: knowledge/10-研发效能与协同

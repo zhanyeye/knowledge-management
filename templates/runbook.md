@@ -4,6 +4,7 @@ owner: ""
 kind: runbook
 maturity: draft
 risk: medium
+automation: L0
 tags: []
 related: []
 created: ""
@@ -54,6 +55,6 @@ last_reviewed: null
 - 处理：
 
 ## 关联
-- registry（涉及哪些资源对象）：
+- inventory（涉及哪些资源，knowledge/<域>/inventory.yaml）：
 - architecture（相关链路图）：
 - 相关 playbook / faq：
