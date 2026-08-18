@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "note": "查询预算/衰减阈值/lint 规则。低频手改本文件即可，引擎零依赖纯标准库。",
+  "budgets": {
+    "troubleshoot": { "dirs": 2, "full": 3, "hint": "排障：先查 playbook，再查 registry 定位资源" },
+    "ops_execute": { "dirs": 1, "full": 1, "hint": "执行手册：完整读目标 runbook；risk=high 必须人工逐项确认" },
+    "locate": { "dirs": 2, "full": 2, "hint": "资源定位：以 registry 台账为主" },
+    "default": { "dirs": 2, "full": 5, "hint": "默认预算" }
+  },
+  "maturity": { "levels": ["draft", "verified", "proven"] },
+  "decay": {
+    "proven_months": 12,
+    "demote_verified_months": 6,
+    "archive_draft_months": 6,
+    "registry_exempt": true
+  },
+  "lint": {
+    "runbook_requires": ["前置条件", "操作步骤", "验证", "回滚"],
+    "playbook_requires": ["症状", "排查", "常见根因", "升级"],
+    "adr_requires": ["背景", "决策", "备选", "影响"],
+    "case_requires": ["现象", "根因", "改进"],
+    "faq_requires": ["Q1"],
+    "architecture_requires": ["mermaid"],
+    "kinds_requiring_risk": ["runbook", "playbook"],
+    "registry_required": ["resource_type", "name", "env", "owner", "entrypoints", "knowledge"],
+    "registry_review_days": 90
+  }
+}

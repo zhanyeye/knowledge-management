@@ -1,0 +1,45 @@
+# 资源台账卡：一个基础设施对象一个文件。只写「事实」，不写操作与决策。
+# 命名：中文名.yaml，如 台账/数据库/mongo-prod.yaml
+resource_type: ""        # cluster|database|middleware|domain|certificate|storage|platform|service|vm
+name: ""
+display_name: ""
+description: ""
+
+env: ""                  # dev|test|prod
+status: active           # active|inactive|deprecated
+criticality: medium      # low|medium|high|critical
+
+owner:
+  team: ""
+  primary: ""
+  escalation: ""
+
+location:
+  network_zone: ""       # 黄区|绿区|通用区
+  cluster: ""
+  namespace: ""
+  hostnames: []
+
+entrypoints:
+  console: ""            # 控制台入口
+  dashboard: ""          # 监控面板
+  logs: ""
+  repo: ""
+
+dependencies:
+  upstream: []
+  downstream: []
+
+operations:
+  change_method: ""      # 变更方式（platform-ui|helm-cd|script|manual）
+  rollback_method: ""
+  retention_policy: ""   # 数据保留/清理策略
+
+knowledge:                # 跨文件关联唯一源：改资源时同步这里的链接，lint 校验存在性
+  runbooks: []
+  playbooks: []
+  adrs: []
+  faqs: []
+
+last_reviewed: ""        # YYYY-MM-DD，lint 超过 90 天告警
+tags: []
