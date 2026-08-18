@@ -257,7 +257,7 @@ hooks（二期）：Claude Code 下加 pre-apply-guard.sh 对 change 类二次�
 
 **首批种子脚本（对准痛点表高频场景，全部 readonly 起步）**：
 disk_usage_scan.sh、find_workload_location.sh、diagnose_pod_oom.sh、px_queue_check.sh
-——各配 1 条 问题定位 文档（symptoms/script/automation:L1），其中 disk_usage_scan 进一步做成 L2 原子 skill 示范（storage/disk-usage-diagnose）。
+——各配 1 条 问题定位 文档（symptoms/script/automation:L1），其中 disk_usage_scan 完整做成 **L2 原子 skill 示范（见「九、种子 Skill 全文示例」）**。
 
 ## 八、实施顺序与验收
 
@@ -272,4 +272,175 @@ disk_usage_scan.sh、find_workload_location.sh、diagnose_pod_oom.sh、px_queue_
 - `问题定位索引.md` 生成且症状→文档→脚本链路可点
 - `search 磁盘满` 命中 06-存储/问题定位/，且能顺着 manifest 找到 disk_usage_scan.sh 跑通（本机可测的只读部分）
 - INDEX.md 展示各域 automation 分布（L0×26 起步）
+- **种子 skill 端到端演示通过**：按「九」的 SKILL.md 走一遍诊断流程（本地目录模拟目标机）
 - 你提供 C 的真实文档后可整体平移（结构同构，无需改写）
+
+## 九、种子 Skill 全文示例：storage/disk-usage-diagnose（L2 示范）
+
+> 这是「知识 skill 化」的标准样板：**SKILL.md（流程）+ script（能力）+ references（判读知识）** 三件套，
+> 通过 manifest 与 问题定位文档 双向互链。照此模式复制即可批量产出原子技能。
+
+### 9.1 目录与互链关系
+
+```
+.claude/skills/storage/disk-usage-diagnose/
+├── SKILL.md                     # 流程（何时用/步骤/输出/升级）
+└── references/
+    └── judgment.md              # 判读知识（引用域内文档，不复制内容）
+
+scripts/storage/disk_usage_scan.sh    # 能力（manifest 登记，readonly）
+knowledge/06-存储/问题定位/px公共文件服务器满.md   # 知识源头（symptoms/skill 字段回链）
+```
+
+### 9.2 SKILL.md（全文）
+
+```markdown
+---
+name: disk-usage-diagnose
+description: 磁盘/inode 告警或写满时的只读诊断。输入目标主机，输出占用画像、
+  疑似根因与处理建议（不执行清理）。当用户说「磁盘满了 / inode 满了 / no space left /
+  写文件失败」或收到存储容量告警时使用。
+---
+
+# 磁盘占用诊断（只读）
+
+## 何时使用
+- 监控告警磁盘或 inode 使用率超阈值
+- 应用报 No space left on device / 写文件失败
+- 执行机 / 公共文件服务器 / MinIO 宿主机疑似写满
+
+## 前置确认（动手前必查）
+1. 目标主机与疑似路径；不知道路径先查 knowledge/06-存储/inventory.yaml
+   （或 03-构建资源管理/inventory.yaml 执行机池），用 infra-locate 定位
+2. 只需要只读登录权限
+3. 本技能只诊断不清理：任何清理/删除动作转 infra-change 走对应手册（risk 分级）
+
+## 步骤
+1. 整体画像（标出超 85% 的挂载点，含 inode）：
+   bash scripts/storage/disk_usage_scan.sh <host> --quick
+2. 对每个超阈值挂载点下钻两层，取 TOP 占用：
+   bash scripts/storage/disk_usage_scan.sh <host> --path <挂载点> --depth 2
+3. 按 references/judgment.md 的模式表判读：
+   - 命中「已知可清理模式」→ 给出建议命令（一律带 --dry-run），交人工或 infra-change 确认执行
+   - 未命中/未知大目录 → 报告路径+大小+属主线索，查 inventory 定位资源 owner
+4. 收尾两件事：
+   - 结论写 reports/YYYY-MM-磁盘诊断-<host>.md
+   - python scripts/infra.py reference knowledge/06-存储/问题定位/px公共文件服务器满.md --in "<简述>"
+
+## 输出格式
+- <host> 磁盘画像（df -h / df -i，超阈值项加标）
+- TOP 占用目录（大小 + 最后修改时间线索）
+- 疑似根因（按 judgment.md 模式编号）+ 置信度
+- 建议动作清单（readonly=已执行；change=待人工确认，逐条附命令）
+
+## 升级条件
+- df 满但 du 找不到大文件 → 已删除文件被进程持有（judgment.md 模式 E），需重启持有进程
+- 涉及生产数据删除 → 一律人工，本技能止步于建议
+- MinIO 对象存储容量问题 → 转其容量 playbook（生命周期策略路径不同）
+```
+
+### 9.3 scripts/storage/disk_usage_scan.sh（全文，readonly）
+
+```bash
+#!/usr/bin/env bash
+# 磁盘占用只读扫描 —— manifest 登记: disk_usage_scan / risk_level: readonly
+# 用法:
+#   disk_usage_scan.sh <host> --quick                     # df 画像，标出超阈值挂载点
+#   disk_usage_scan.sh <host> --path <dir> [--depth N]    # 逐层 du 下钻 TOP20
+# 说明: 仅执行 df/du 只读命令，不做任何变更；host 为本机时可用 local 代替。
+set -euo pipefail
+
+HOST="${1:?用法: $0 <host> (--quick | --path <dir>) [--depth N] [--threshold P]}"
+THRESH=85
+DEPTH=2
+MODE=""
+DIR=""
+shift
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --quick)     MODE="quick" ;;
+    --path)      MODE="path"; DIR="${2:?--path 需要目录参数}"; shift ;;
+    --depth)     DEPTH="$2";   shift ;;
+    --threshold) THRESH="$2";  shift ;;
+    *) echo "未知参数: $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+[ -n "$MODE" ] || { echo "必须指定 --quick 或 --path <dir>" >&2; exit 2; }
+
+run() {  # host=local 时本机执行，否则 ssh
+  if [ "$HOST" = "local" ]; then bash -c "$1"; else ssh -o BatchMode=yes "$HOST" "$1"; fi
+}
+
+case "$MODE" in
+  quick)
+    echo "== df -h（标出使用率>${THRESH}%） =="
+    run "df -hP | awk -v t=$THRESH 'NR==1 || substr(\$5,1,length(\$5)-1)+0>t'"
+    echo; echo "== df -i（inode，标出使用率>${THRESH}%） =="
+    run "df -iP | awk -v t=$THRESH 'NR==1 || substr(\$5,1,length(\$5)-1)+0>t'"
+    echo; echo "== 全量 df -h =="; run "df -h"
+    ;;
+  path)
+    echo "== du 下钻 $DIR (depth=$DEPTH, TOP20) =="
+    run "du -h --max-depth=$DEPTH '$DIR' 2>/dev/null | sort -rh | head -20"
+    ;;
+  *) echo "内部错误: 未知模式 $MODE" >&2; exit 2 ;;
+esac
+```
+
+### 9.4 references/judgment.md（全文要点）
+
+```markdown
+# 磁盘占用判读标准（只读诊断的"大脑"）
+
+| 模式 | 特征 | 确认命令（readonly） | 处置方向 |
+|---|---|---|---|
+| A 日志堆积 | /var/log、应用 logs 目录占比大，文件按天滚动未清理 | ls -lh <dir>; du -sh <dir> | 配置轮转/压缩归档；清理走手册 |
+| B docker 膨胀 | /var/lib/docker 大 | docker system df | prune 建议（change，人工确认） |
+| C 构建残留 | 执行机 /tmp、工作目录脏数据 | du --max-depth=1 /tmp | 链 03/问题定位/执行机残留构建失败.md |
+| D 海量小文件 inode 满 | df -i 满而 df -h 不满 | df -i; find <dir> -type f \| wc -l | 定位小文件目录（minio 对象/队列） |
+| E 幽灵占用 | df 满但 du 总和对不上 | lsof +L1 或 lsof \| grep deleted | 重启持有进程（change，人工） |
+| F 保留块 | ext4 默认保留 5%，非 root 可写满 | tune2fs -l <dev> \| grep -i reserved | 评估调低保留比例（change） |
+
+判读原则：命中 A–D 给出 dry-run 建议；E/F 先报告证据链再谈处置；
+任何生产数据删除一律人工。owner 未知的目录先查 knowledge/*/inventory.yaml。
+```
+
+### 9.5 接线（manifest + 问题定位文档 frontmatter）
+
+```yaml
+# scripts/manifest.yaml 追加
+- name: disk_usage_scan
+  domain: storage
+  path: scripts/storage/disk_usage_scan.sh
+  description: 分层扫描目录找出磁盘/inode 占用（只读）
+  risk_level: readonly
+  entry_command: "bash scripts/storage/disk_usage_scan.sh <host> --quick"
+  related_doc: knowledge/06-存储/问题定位/px公共文件服务器满.md
+```
+
+```yaml
+# knowledge/06-存储/问题定位/px公共文件服务器满.md 的 frontmatter
+symptoms: [磁盘满, inode满, no space left, 写文件失败]
+script: scripts/storage/disk_usage_scan.sh
+skill: storage/disk-usage-diagnose
+automation: L2
+```
+
+→ `infra.py index` 自动把它写进 问题定位索引.md；lint 校验 script 已登记、
+skill 目录存在；INDEX.md 的 storage 域自动化率出现首个 L2。
+
+## 十、原子 Skill 编写规范（L2 验收清单）
+
+新技能合入前逐条自检（lint 能查的查 lint，查不了的走 review）：
+
+1. **单一职责**：一个技能只解决一类症状/动作；跨域内容放 references 引用，不复制
+2. **只读优先**：脚本默认 readonly；确需变更则拆「诊断(readonly) + 处置(change 手册)」两段
+3. **change 必带 dry-run**：manifest 里 risk_level: change 的脚本必须支持 --dry-run（lint 检查）
+4. **登记才可执行**：脚本必须进 manifest 且 related_doc 指回知识文档；无登记=不存在
+5. **知识不搬家**：判读/背景知识写在 references/ 并链接域内文档，SKILL.md 只写流程，≤200 行
+6. **留痕闭环**：执行后写 reports/ + `infra.py reference` 记引用（衰减机制靠它）
+7. **命名**：`.claude/skills/<域>/<动词-对象>/`，英文 kebab-case，与 manifest 的 name 对应
+8. **升级路径**：SKILL.md 头部标注当前 automation 级别；连续 3 次人工零干预跑通可申报 L3（CI 触发）
+```
+
