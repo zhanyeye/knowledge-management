@@ -79,6 +79,7 @@ frontmatter 标 `automation`，INDEX.md 展示各域分布。不强求全 L3，�
 python scripts/infra.py {index,search,lint,decay,reference,verify,new}
 
 任务入口（.claude/skills/）：infra-locate / infra-change / infra-troubleshoot / infra-import
+斜杠命令（.claude/commands/，薄路由）：/infra 查询 · /infra-import 导入 · /infra-exec 执行
 原子技能（.claude/skills/<域>/<名>/）：如 storage/disk-usage-diagnose
 
 INDEX.md 总索引          问题定位索引.md 症状路由     域路由表.yaml agent寻址
