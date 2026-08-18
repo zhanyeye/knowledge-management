@@ -1,17 +1,17 @@
 # 基础设施知识库 · 总索引
 
-> 自动生成于 2026-08-18，共 26 条。三级检索：本文件 → 域 INDEX.md → 按预算读全文。
+> 自动生成于 2026-08-18，共 0 条。三级检索：本文件 → 域 INDEX.md → 按预算读全文。
 > 排障先读 [问题定位索引.md](问题定位索引.md)；执行脚本先查 scripts/manifest.yaml（三层闸门见 AGENTS.md）。
 
 | 域 | 路径 | 条数 | L0/L1/L2/L3 | draft/verified/proven |
 |---|---|---|---|---|
-| 通用环境基线 | [knowledge/00-通用环境基线/](knowledge/00-通用环境基线/INDEX.md) | 1 | 1/0/0/0 | 1/0/0 |
-| 镜像制作 | [knowledge/01-镜像制作/](knowledge/01-镜像制作/INDEX.md) | 1 | 1/0/0/0 | 1/0/0 |
-| K8s资源管理 | [knowledge/02-k8s资源管理/](knowledge/02-k8s资源管理/INDEX.md) | 6 | 4/2/0/0 | 6/0/0 |
-| 构建资源管理 | [knowledge/03-构建资源管理/](knowledge/03-构建资源管理/INDEX.md) | 8 | 7/1/0/0 | 8/0/0 |
-| 网络管理 | [knowledge/04-网络管理/](knowledge/04-网络管理/INDEX.md) | 7 | 7/0/0/0 | 7/0/0 |
-| 数据库 | [knowledge/05-数据库/](knowledge/05-数据库/INDEX.md) | 1 | 1/0/0/0 | 1/0/0 |
-| 存储 | [knowledge/06-存储/](knowledge/06-存储/INDEX.md) | 2 | 1/0/1/0 | 2/0/0 |
+| 通用环境基线 | [knowledge/00-通用环境基线/](knowledge/00-通用环境基线/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
+| 镜像制作 | [knowledge/01-镜像制作/](knowledge/01-镜像制作/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
+| K8s资源管理 | [knowledge/02-k8s资源管理/](knowledge/02-k8s资源管理/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
+| 构建资源管理 | [knowledge/03-构建资源管理/](knowledge/03-构建资源管理/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
+| 网络管理 | [knowledge/04-网络管理/](knowledge/04-网络管理/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
+| 数据库 | [knowledge/05-数据库/](knowledge/05-数据库/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
+| 存储 | [knowledge/06-存储/](knowledge/06-存储/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
 | 消息中间件 | [knowledge/07-消息中间件/](knowledge/07-消息中间件/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
 | 数据工程与AI平台 | [knowledge/08-数据工程与AI平台/](knowledge/08-数据工程与AI平台/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
 | 业务平台对接 | [knowledge/09-业务平台对接/](knowledge/09-业务平台对接/INDEX.md) | 0 | 0/0/0/0 | 0/0/0 |
