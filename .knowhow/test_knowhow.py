@@ -284,6 +284,109 @@ class TestNew(TmpRepoTestCase):
         with self.assertRaises(SystemExit):
             infra.cmd_new(CFG, self.ns(kind="playbook", slug="x", domain="nope"))
 
+    def test_new_runbook_subdir(self):
+        tpl = infra.ROOT / "templates" / "runbook.md"
+        tpl.parent.mkdir(parents=True, exist_ok=True)
+        tpl.write_text(
+            "---\ntitle: \"\"\nowner: \"\"\nkind: runbook\nmaturity: draft\n"
+            "risk: medium\nautomation: L0\ntags: []\nrelated: []\ncreated: \"\"\n"
+            "last_verified: null\nlast_reviewed: null\n---\n\n"
+            "## 前置条件\nx\n## 操作步骤\nx\n## 验证\nx\n## 回滚\nx\n",
+            encoding="utf-8", newline="\n")
+        infra.cmd_new(CFG, self.ns(kind="runbook", slug="域名申请", domain="network",
+                                   title="域名申请", tags="dns", subdir="DNS域名解析"))
+        dest = infra.ROOT / "knowledge/04-网络管理/DNS域名解析/域名申请.md"
+        self.assertTrue(dest.is_file())
+
+    def test_new_playbook_rejects_subdir(self):
+        with self.assertRaises(SystemExit):
+            infra.cmd_new(CFG, self.ns(kind="playbook", slug="x", domain="storage",
+                                       title="x", tags=None, subdir="问题定位"))
+
+    def test_new_subdir_dotdot_fails(self):
+        with self.assertRaises(SystemExit):
+            infra.cmd_new(CFG, self.ns(kind="runbook", slug="x", domain="network",
+                                       title="x", tags=None, subdir="../k8s"))
+
+
+class TestFrontmatterBlock(unittest.TestCase):
+    def test_block_list_symptoms(self):
+        text = ("---\ntitle: 磁盘满\nowner: t\nkind: playbook\nmaturity: draft\n"
+                "risk: low\nsymptoms:\n  - 磁盘满\n  - inode满\n"
+                "tags: []\nrelated: []\ncreated: 2026-08-18\n---\n\nbody\n")
+        meta, body = infra.parse_frontmatter(text)
+        self.assertEqual(meta["symptoms"], ["磁盘满", "inode满"])
+        self.assertEqual(body.strip(), "body")
+        dumped = infra.dump_frontmatter(meta)
+        meta2, _ = infra.parse_frontmatter(dumped + "\nbody\n")
+        self.assertEqual(meta2["symptoms"], ["磁盘满", "inode满"])
+
+    def test_inline_list_still_works(self):
+        text = ("---\ntitle: t\nowner: t\nkind: playbook\nmaturity: draft\n"
+                "risk: low\nsymptoms: [磁盘满, inode满]\ntags: []\n"
+                "related: []\ncreated: 2026-08-18\n---\n\nx\n")
+        meta, _ = infra.parse_frontmatter(text)
+        self.assertEqual(meta["symptoms"], ["磁盘满", "inode满"])
+
+
+class TestIndexBlockSymptoms(TmpRepoTestCase):
+    def test_block_symptoms_enter_index(self):
+        self.write("scripts/manifest.yaml", "")
+        self.write(
+            "knowledge/06-存储/问题定位/inode.md",
+            "---\ntitle: inode满\nowner: t\nkind: playbook\nmaturity: draft\n"
+            "risk: low\nautomation: L0\nsymptoms:\n  - inode满\n  - 写文件失败\n"
+            "tags: []\nrelated: []\ncreated: 2026-08-18\n"
+            "last_verified: null\nlast_reviewed: null\n---\n\n"
+            + PLAYBOOK_BODY)
+        infra.cmd_index(CFG, self.ns())
+        sym = (infra.ROOT / "问题定位索引.md").read_text(encoding="utf-8")
+        self.assertIn("inode满", sym)
+        self.assertIn("写文件失败", sym)
+
+
+class TestVerifyInventory(TmpRepoTestCase):
+    INV = (
+        "resources:\n"
+        "  - resource_type: storage\n    name: minio\n    env: prod\n"
+        "    owner:\n      team: t\n    entrypoints:\n      console: c\n"
+        "    last_reviewed: 2026-01-01\n"
+        "  - resource_type: storage\n    name: fileserver\n    env: prod\n"
+        "    owner:\n      team: t\n    entrypoints:\n      console: c\n"
+        "    last_reviewed: 2026-01-01\n"
+    )
+
+    def test_name_only_updates_one(self):
+        p = self.write("knowledge/06-存储/inventory.yaml", self.INV)
+        infra.cmd_verify(CFG, self.ns(path=str(p), proven=False, name="minio",
+                                      all_resources=False))
+        text = p.read_text(encoding="utf-8")
+        today = infra.today_str()
+        self.assertIn(f"name: minio\n", text)
+        self.assertRegex(text, r"name: minio[\s\S]*?last_reviewed: " + today)
+        self.assertIn("name: fileserver", text)
+        self.assertIn("last_reviewed: 2026-01-01", text)
+
+    def test_requires_name_or_all(self):
+        p = self.write("knowledge/06-存储/inventory.yaml", self.INV)
+        with self.assertRaises(SystemExit):
+            infra.cmd_verify(CFG, self.ns(path=str(p), proven=False, name=None,
+                                          all_resources=False))
+
+    def test_all_updates_both(self):
+        p = self.write("knowledge/06-存储/inventory.yaml", self.INV)
+        infra.cmd_verify(CFG, self.ns(path=str(p), proven=False, name=None,
+                                      all_resources=True))
+        text = p.read_text(encoding="utf-8")
+        self.assertEqual(text.count("last_reviewed: 2026-01-01"), 0)
+        self.assertEqual(text.count(f"last_reviewed: {infra.today_str()}"), 2)
+
+    def test_unknown_name_fails(self):
+        p = self.write("knowledge/06-存储/inventory.yaml", self.INV)
+        with self.assertRaises(SystemExit):
+            infra.cmd_verify(CFG, self.ns(path=str(p), proven=False, name="nope",
+                                          all_resources=False))
+
 
 if __name__ == "__main__":
     unittest.main()

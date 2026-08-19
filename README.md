@@ -48,7 +48,7 @@
 ## 写入与治理
 
 ```
-python .knowhow/knowhow.py new runbook 域名申请 --domain network   # 直接生成到目标域
+python .knowhow/knowhow.py new runbook 域名申请 --domain network --subdir DNS域名解析
 （补内容：缺的信息写 TODO 禁止编造；playbook 标 symptoms）
 python .knowhow/knowhow.py lint        # 零错误后 commit，git diff 即评审
 ```

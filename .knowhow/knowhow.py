@@ -7,8 +7,8 @@
   lint                     结构/链接/manifest/自动化标注治理，错误时退出码 1
   decay                    成熟度衰减（verified 6月无信号降 draft；draft 闲置报删除建议）
   reference <路径...>      记引用（写 .knowhow/refs-YYYY.jsonl，不改条目）
-  verify <路径>            升成熟度 / inventory 复审（last_reviewed）
-  new <kind> <名>          按模板生成到目标域（--domain 必填）
+  verify <路径>            升成熟度 / inventory 复审（--name 一条，或 --all）
+  new <kind> <名>          按模板生成到目标域（--domain 必填；runbook 等可用 --subdir）
 
 约定见 AGENTS.md；配置 .knowhow/knowhow.json；运维脚本登记表 scripts/manifest.yaml。
 """
@@ -39,6 +39,8 @@ KIND_TEMPLATES = {
     "architecture": "architecture.md", "reference": "reference.md",
 }
 SKIP_FILES = {"INDEX.md", "MANIFEST.md", "README.md", "glossary.md"}
+KIND_SUBDIR_OK = ("runbook", "reference", "faq", "architecture")
+RESERVED_SUBDIRS = ("问题定位", "复盘", "方案设计")
 
 
 def out(s=""):
@@ -89,7 +91,7 @@ def os_user():
         return "unknown"
 
 
-# ---------------------------------------------------------- frontmatter（扁平子集）
+# ---------------------------------------------------------- frontmatter（YAML 子集，与 parse_yaml 相同）
 
 def _split_top(s):
     parts, depth, buf = [], 0, []
@@ -135,14 +137,8 @@ def parse_frontmatter(text):
     m = re.match(r"^---\s*\n(.*?)\n---\s*\n?", text, re.S)
     if not m:
         return None, text
-    meta = {}
-    for line in m.group(1).splitlines():
-        line = line.rstrip()
-        if not line or line.lstrip().startswith("#"):
-            continue
-        kv = re.match(r"^([A-Za-z0-9_]+)\s*:\s*(.*)$", line)
-        if kv:
-            meta[kv.group(1)] = _parse_scalar(kv.group(2))
+    data = parse_yaml(m.group(1))
+    meta = data if isinstance(data, dict) else {}
     return meta, text[m.end():]
 
 
@@ -732,7 +728,89 @@ def cmd_decay(cfg, args):
     append_log("decay", os_user(), f"{len(actions)} actions")
 
 
-# ---------------------------------------------------------- reference / verify / new
+def safe_subdir(domain_top, subdir):
+    """域内相对子目录，禁止 .. 与 kind 固定目录。"""
+    raw = str(subdir).replace("\\", "/").strip().strip("/")
+    if not raw:
+        die("--subdir 为空")
+    parts = raw.split("/")
+    if any(p in ("", ".", "..") for p in parts):
+        die(f"--subdir 非法: {subdir}")
+    if parts[0] in RESERVED_SUBDIRS:
+        die(f"--subdir 不能是「{parts[0]}」（该目录 kind 固定，不要加 --subdir）")
+    dest = domain_top.joinpath(*parts)
+    try:
+        dest.resolve().relative_to(domain_top.resolve())
+    except ValueError:
+        die(f"--subdir 超出域目录: {subdir}")
+    if dest.resolve() == domain_top.resolve():
+        die("--subdir 无效")
+    return dest
+
+
+def stamp_inventory_reviewed(text, today, name=None):
+    """只改 resources 列表项这一层的 last_reviewed。name=None 表示全部资源。"""
+    data = parse_yaml(text)
+    resources = data.get("resources") if isinstance(data, dict) else None
+    if not isinstance(resources, list):
+        die("不是有效 inventory（缺少 resources 列表）")
+    known = [r.get("name") for r in resources if isinstance(r, dict) and r.get("name")]
+    if name is not None:
+        if name not in known:
+            shown = "、".join(str(x) for x in known) or "（空）"
+            die(f"未找到资源 {name}（现有: {shown}）")
+        targets = {name}
+    else:
+        targets = set(known)
+
+    in_resources = False
+    dash_indent = None
+    current_name = None
+    n = 0
+    lines_out = []
+    for raw in text.splitlines(True):
+        if raw.endswith("\n"):
+            core, nl = raw[:-1], "\n"
+        else:
+            core, nl = raw, ""
+        stripped = core.strip()
+        if stripped.startswith("resources:") or stripped == "resources:":
+            in_resources = True
+            dash_indent = None
+            current_name = None
+            lines_out.append(raw)
+            continue
+        if in_resources:
+            m_dash = re.match(r"^(\s*)-\s+(.*)$", core)
+            if m_dash:
+                ind = len(m_dash.group(1))
+                if dash_indent is None:
+                    dash_indent = ind
+                if ind == dash_indent:
+                    current_name = None
+                    rest = m_dash.group(2)
+                    nm = re.match(r"^name\s*:\s*(.+)$", rest)
+                    if nm:
+                        current_name = _parse_scalar(nm.group(1).strip())
+                lines_out.append(raw)
+                continue
+            if dash_indent is not None:
+                m_name = re.match(r"^(\s*)name\s*:\s*(.+)$", core)
+                if m_name and len(m_name.group(1)) == dash_indent + 2:
+                    current_name = _parse_scalar(m_name.group(2).strip())
+                m_rev = re.match(r"^(\s*)last_reviewed\s*:.*$", core)
+                if m_rev and len(m_rev.group(1)) == dash_indent + 2:
+                    if name is None or current_name in targets:
+                        core = f"{m_rev.group(1)}last_reviewed: {today}"
+                        n += 1
+                        lines_out.append(core + nl)
+                        continue
+        lines_out.append(raw)
+    if n == 0:
+        die("没有可更新的 last_reviewed 字段"
+            + (f"（资源 {name}）" if name else ""))
+    return "".join(lines_out), n
+
 
 def _resolve_entry(rel_or_path):
     p = Path(rel_or_path)
@@ -764,12 +842,24 @@ def cmd_verify(cfg, args):
         die(f"未找到 {args.path}")
     p = ROOT / rel
     if p.suffix == ".yaml":
+        name = getattr(args, "name", None)
+        all_resources = getattr(args, "all_resources", False)
+        if name and all_resources:
+            die("不要同时使用 --name 和 --all")
+        if not name and not all_resources:
+            die("复审 inventory 必须指定 --name <资源名>，或显式 --all（会刷新该文件全部资源）")
         text = p.read_text(encoding="utf-8")
-        n = len(re.findall(r"(?m)^(\s*)last_reviewed:.*$", text))
-        text = re.sub(r"(?m)^(\s*)last_reviewed:.*$", r"\1last_reviewed: " + today_str(), text)
-        p.write_text(text, encoding="utf-8")
-        out(f"[knowhow] inventory 复审已记录: {rel}（{n} 条资源 last_reviewed={today_str()}）")
+        new_text, n = stamp_inventory_reviewed(
+            text, today_str(), name=None if all_resources else name)
+        p.write_text(new_text, encoding="utf-8")
+        if all_resources:
+            out(f"[knowhow] inventory 整份复审: {rel}（{n} 条 last_reviewed={today_str()}）")
+        else:
+            out(f"[knowhow] inventory 复审已记录: {rel} / {name}"
+                f"（last_reviewed={today_str()}）")
     else:
+        if getattr(args, "name", None) or getattr(args, "all_resources", False):
+            die("--name / --all 仅用于 inventory.yaml")
         meta, body = parse_frontmatter(p.read_text(encoding="utf-8"))
         if meta is None:
             die(f"{rel} 缺少 frontmatter")
@@ -793,6 +883,9 @@ def cmd_new(cfg, args):
         die(f"未知 domain: {args.domain}（可选 {'/'.join(cfg['domains'])}；见 域路由表.yaml）")
     top = dmeta["path"]
     slug = args.slug
+    subdir = getattr(args, "subdir", None)
+    if subdir and args.kind not in KIND_SUBDIR_OK:
+        die(f"{args.kind} 不能使用 --subdir（playbook/case/adr/registry 落点固定）")
     if args.kind == "registry":
         dest = ROOT / top / "inventory.yaml"
         if dest.exists():
@@ -811,7 +904,10 @@ def cmd_new(cfg, args):
             slug = f"faq-{slug}"
         if args.kind == "architecture" and not slug.startswith("architecture"):
             slug = f"architecture-{slug}"
-        dest = ROOT / top / f"{slug}.md"
+        dest_dir = ROOT / top
+        if subdir:
+            dest_dir = safe_subdir(dest_dir, subdir)
+        dest = dest_dir / f"{slug}.md"
     if dest.exists():
         die(f"已存在 {dest.relative_to(ROOT).as_posix()}")
     tpl = ROOT / "templates" / KIND_TEMPLATES[args.kind]
@@ -856,6 +952,9 @@ def main(argv=None):
     p_v = sub.add_parser("verify", help="验证/复审条目")
     p_v.add_argument("path")
     p_v.add_argument("--proven", action="store_true", help="标记为 proven（实战检验）")
+    p_v.add_argument("--name", help="inventory 资源名（只复审这一条）")
+    p_v.add_argument("--all", dest="all_resources", action="store_true",
+                     help="刷新该 inventory 文件全部资源的 last_reviewed")
 
     p_n = sub.add_parser("new", help="按模板生成到目标域")
     p_n.add_argument("kind", choices=list(KINDS))
@@ -863,6 +962,7 @@ def main(argv=None):
     p_n.add_argument("--domain", required=True, help="域键，见 域路由表.yaml")
     p_n.add_argument("--title", help="中文标题")
     p_n.add_argument("--tags", help="逗号分隔")
+    p_n.add_argument("--subdir", help="域内子目录，仅 runbook/reference/faq/architecture")
 
     args = ap.parse_args(argv)
     cfg = load_config()

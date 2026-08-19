@@ -55,7 +55,7 @@
 
 ## 三、写入规则（直接写目标位置，git 即评审）
 
-1. `python .knowhow/knowhow.py new <kind> <名> --domain <域键>` 生成骨架（maturity=draft）
+1. `python .knowhow/knowhow.py new <kind> <名> --domain <域键> [--subdir <域内子目录>]` 生成骨架（maturity=draft）。`--subdir` 仅 runbook/reference/faq/architecture；playbook/case/adr 落点固定，不要加。
 2. 套模板补内容；**禁止编造**：原始材料没有的信息写 `TODO`，不确定命令标 `待确认`
 3. playbook 标 `symptoms`（进问题定位索引）；配了脚本标 `script`（必须已登记 manifest）
 4. 涉及资源对象 → 同步 `inventory.yaml` 的 `knowledge.*` 链接（跨文件关联唯一源）
@@ -80,7 +80,7 @@ frontmatter 标 `automation`，INDEX.md 展示各域分布。不强求全 L3，�
 
 ## 六、治理
 
-- 成熟度：draft → verified（`python .knowhow/knowhow.py verify <路径>`）→ proven（`--proven`，实战检验）
+- 成熟度：draft → verified（`python .knowhow/knowhow.py verify <路径>`）→ proven（`--proven`，实战检验）。inventory 复审必须 `--name <资源>`，整份刷新才用 `--all`。
 - 衰减：手册/排障 6 个月无引用/复审信号自动降级；draft 闲置由 decay 报「建议删除」（人工 git rm，历史可恢复）；资产清单走 last_reviewed 90 天告警
 - **命中并使用知识必须记引用**：`python .knowhow/knowhow.py reference <路径> --in "<上下文>"`
 - CI（.github/workflows/lint.yml）：lint + 单测，错误清零才能合入

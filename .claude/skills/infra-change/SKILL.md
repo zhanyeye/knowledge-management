@@ -29,6 +29,6 @@ description: 基础设施变更指引与执行。当用户说「我要做 XX」�
 Grep 与域 INDEX 都未命中，才视为没有手册。不要把一次关键词落空当成库里没有。
 
 不要凭通用知识直接在生产上操作：
-1. 从用户/已有文档收集步骤，`python .knowhow/knowhow.py new runbook <名> --domain <域>` 落骨架；
+1. 从用户/已有文档收集步骤，`python .knowhow/knowhow.py new runbook <名> --domain <域> [--subdir <产品目录>]` 落骨架；
 2. 用户确认步骤无误后按闸门执行；
 3. 执行验证后 `verify` 升级，下次就有手册了。高频动作顺势 L1 化：步骤抽成脚本登记 manifest。

@@ -30,6 +30,9 @@ description: 知识导入与整理入库。当用户提供文档/表格/笔记/�
 
 ```bash
 python .knowhow/knowhow.py new <kind> <中文文件名> --domain <域键> --title "<中文标题>" --tags "<逗号分隔>"
+# runbook/reference 对得上产品子目录时加上，例如：
+#   --subdir DNS域名解析
+# playbook/case/adr/registry 不要加 --subdir
 ```
 
 填充规则：
