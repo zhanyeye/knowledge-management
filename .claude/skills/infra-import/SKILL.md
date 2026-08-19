@@ -29,7 +29,7 @@ description: 知识导入与整理入库。当用户提供文档/表格/笔记/�
 ### 2. 生成与填充
 
 ```bash
-python scripts/infra.py new <kind> <中文文件名> --domain <域键> --title "<中文标题>" --tags "<逗号分隔>"
+python .knowhow/knowhow.py new <kind> <中文文件名> --domain <域键> --title "<中文标题>" --tags "<逗号分隔>"
 ```
 
 填充规则：
@@ -41,8 +41,8 @@ python scripts/infra.py new <kind> <中文文件名> --domain <域键> --title "
 ### 3. 校验与交付
 
 ```bash
-python scripts/infra.py lint    # 错误清零（TODO 不算错误）
-python scripts/infra.py index   # 刷新索引三件套
+python .knowhow/knowhow.py lint    # 错误清零（TODO 不算错误）
+python .knowhow/knowhow.py index   # 刷新索引三件套
 ```
 
 向用户报告：每条「文件 → kind/域 → 遗留 TODO」，等 review。git diff/commit 即评审，无暂存区。

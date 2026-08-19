@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "note": "方案D域制结构。域清单驱动 index 生成域路由表/问题定位索引；预算/阈值/lint 规则。",
+  "note": "知识库引擎配置。域清单驱动 index 生成域路由表/问题定位索引；预算/阈值/lint 规则。",
   "domains": {
     "base":    {"path": "knowledge/00-通用环境基线", "title": "通用环境基线"},
     "image":   {"path": "knowledge/01-镜像制作", "title": "镜像制作"},

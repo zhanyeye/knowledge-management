@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""infra.py 核心行为单测（stdlib unittest，零依赖）· 方案D域制"""
+"""knowhow.py 核心行为单测（stdlib unittest，零依赖）· 方案D域制"""
 import argparse
 import importlib.util
 import json
@@ -9,9 +9,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parent / "infra.py"
+SCRIPT = Path(__file__).resolve().parent / "knowhow.py"
 
-spec = importlib.util.spec_from_file_location("infra", SCRIPT)
+spec = importlib.util.spec_from_file_location("knowhow", SCRIPT)
 infra = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(infra)
 
@@ -241,7 +241,7 @@ class TestReferenceSidecar(TmpRepoTestCase):
         rel = "knowledge/06-存储/问题定位/磁盘满.md"
         infra.cmd_reference(CFG, self.ns(paths=[rel], in_context="unit"))
         self.assertEqual(before, p.read_text(encoding="utf-8"))
-        refs = infra.ROOT / ".infra" / f"refs-{infra.date.today().year}.jsonl"
+        refs = infra.ROOT / ".knowhow" / f"refs-{infra.date.today().year}.jsonl"
         self.assertTrue(refs.is_file())
         rec = json.loads(refs.read_text(encoding="utf-8").strip())
         self.assertEqual(rec["ref"], rel)
@@ -283,14 +283,6 @@ class TestNew(TmpRepoTestCase):
     def test_new_unknown_domain_fails(self):
         with self.assertRaises(SystemExit):
             infra.cmd_new(CFG, self.ns(kind="playbook", slug="x", domain="nope"))
-
-
-class TestScore(TmpRepoTestCase):
-    def test_title_weighted_higher_than_body(self):
-        e1 = infra.Entry(Path("knowledge/x/a.md"), {"title": "独有词xyzabc", "tags": []}, "其他")
-        e2 = infra.Entry(Path("knowledge/x/b.md"), {"title": "其他", "tags": []}, "独有词xyzabc")
-        t = infra._tokens("独有词xyzabc")
-        self.assertGreater(infra.score_entry(e1, t), infra.score_entry(e2, t))
 
 
 if __name__ == "__main__":

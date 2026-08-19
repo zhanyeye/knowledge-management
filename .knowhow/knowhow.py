@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""infra.py — 基础设施知识库引擎（纯标准库，零依赖）· 方案D域制结构
+"""knowhow.py — 知识库引擎（纯标准库，零依赖）· 方案D域制结构
 
 子命令：
   index                    生成 INDEX.md（总）+ 域 INDEX.md + 问题定位索引.md + 域路由表.yaml
-  search <词...>           加权检索（标题x4 tagsx3 H2x2 正文x1），--kind 过滤
   lint                     结构/链接/manifest/自动化标注治理，错误时退出码 1
   decay                    成熟度衰减（verified 6月无信号降 draft；draft 闲置报删除建议）
-  reference <路径...>      记引用（写 .infra/refs-YYYY.jsonl，不改条目）
+  reference <路径...>      记引用（写 .knowhow/refs-YYYY.jsonl，不改条目）
   verify <路径>            升成熟度 / inventory 复审（last_reviewed）
   new <kind> <名>          按模板生成到目标域（--domain 必填）
 
-约定见 AGENTS.md；配置 scripts/infra.json；脚本登记表 scripts/manifest.yaml。
+约定见 AGENTS.md；配置 .knowhow/knowhow.json；运维脚本登记表 scripts/manifest.yaml。
 """
 import argparse
 import getpass
 import json
 import re
 import sys
-import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -48,12 +46,12 @@ def out(s=""):
 
 
 def die(msg, code=1):
-    out(f"[infra] 错误: {msg}")
+    out(f"[knowhow] 错误: {msg}")
     sys.exit(code)
 
 
 def config_path():
-    return ROOT / "scripts" / "infra.json"
+    return Path(__file__).resolve().parent / "knowhow.json"
 
 
 def load_config():
@@ -63,7 +61,7 @@ def load_config():
     try:
         return json.loads(p.read_text(encoding="utf-8"))
     except json.JSONDecodeError as ex:
-        die(f"infra.json 格式错误（第 {ex.lineno} 行第 {ex.colno} 列）: {ex.msg}")
+        die(f"knowhow.json 格式错误（第 {ex.lineno} 行第 {ex.colno} 列）: {ex.msg}")
         return None
 
 
@@ -397,17 +395,17 @@ def load_manifest(cfg):
 
 # ---------------------------------------------------------- 引用旁车
 
-def infra_dir():
-    return ROOT / ".infra"
+def knowhow_dir():
+    return ROOT / ".knowhow"
 
 
 def refs_log_file():
-    return infra_dir() / f"refs-{date.today().year}.jsonl"
+    return knowhow_dir() / f"refs-{date.today().year}.jsonl"
 
 
 def load_reference_index():
     index = {}
-    d = infra_dir()
+    d = knowhow_dir()
     if not d.is_dir():
         return index
     for path in sorted(d.glob("refs-*.jsonl")):
@@ -432,7 +430,7 @@ def load_reference_index():
 
 
 def append_reference(rel, context, actor=None):
-    infra_dir().mkdir(parents=True, exist_ok=True)
+    knowhow_dir().mkdir(parents=True, exist_ok=True)
     record = {"date": today_str(), "ref": rel, "context": context,
               "actor": actor or os_user()}
     with open(refs_log_file(), "a", encoding="utf-8") as f:
@@ -440,84 +438,13 @@ def append_reference(rel, context, actor=None):
 
 
 def append_log(event, actor, detail):
-    infra_dir().mkdir(parents=True, exist_ok=True)
-    path = infra_dir() / f"log-{date.today().year}.md"
+    knowhow_dir().mkdir(parents=True, exist_ok=True)
+    path = knowhow_dir() / f"log-{date.today().year}.md"
     if not path.exists():
-        path.write_text(f"# Infra 操作日志 {date.today().year}（append-only）\n\n",
+        path.write_text(f"# Knowhow 操作日志 {date.today().year}（append-only）\n\n",
                         encoding="utf-8")
     with open(path, "a", encoding="utf-8") as f:
         f.write(f"- [{today_str()}] {event} | {actor} | {detail}\n")
-
-
-# ---------------------------------------------------------- 检索（加权评分）
-
-def _norm_text(s):
-    return unicodedata.normalize("NFKC", str(s)).lower()
-
-
-def _tokens(s):
-    s = _norm_text(s)
-    words = set(re.findall(r"[a-z0-9]+", s))
-    cjk = "".join(c for c in s if "\u4e00" <= c <= "\u9fff")
-    bigrams = {cjk[i:i + 2] for i in range(len(cjk) - 1)} if len(cjk) > 1 else set()
-    return words | set(cjk) | bigrams
-
-
-def _h2_headings(body):
-    return " ".join(m.group(1) for m in re.finditer(r"^##\s+(.+)$", body, re.M))
-
-
-def score_entry(entry, terms):
-    title_toks = _tokens(entry.title)
-    tag_toks = _tokens(" ".join(entry.tags) + " " + entry.path.stem)
-    h2_toks = _tokens(_h2_headings(entry.body))
-    body_toks = _tokens(entry.body + " " + json.dumps(entry.meta, ensure_ascii=False))
-    score = 0
-    for t in terms:
-        if t in title_toks:
-            score += 4
-        if t in tag_toks:
-            score += 3
-        if t in h2_toks:
-            score += 2
-        if t in body_toks:
-            score += 1
-    return score
-
-
-KIND_BUDGET = {"playbook": "troubleshoot", "runbook": "ops_execute", "registry": "locate"}
-
-
-def cmd_search(cfg, args):
-    entries = load_all(cfg)
-    if args.kind:
-        wanted = args.kind if args.kind in KINDS else args.kind.rstrip("s")
-        if wanted not in KINDS:
-            die(f"未知 kind: {args.kind}（可选 {'/'.join(KINDS)}）")
-        entries = [e for e in entries if e.kind == wanted]
-        args.kind = wanted
-    terms = _tokens(" ".join(args.query))
-    scored = sorted(((score_entry(e, terms), e) for e in entries),
-                    key=lambda p: (-p[0], p[1].rel))
-    hits = [(s, e) for s, e in scored if s > 0][: args.limit]
-    if not hits:
-        out("[infra] 无匹配。可放宽关键词、去掉 --kind，或读 INDEX.md / 问题定位索引.md。")
-        return
-    out(f"[infra] 命中 {len(hits)} 条:")
-    for s, e in hits:
-        out(f"  {e.line()}")
-    if args.full:
-        for s, e in hits[: args.full]:
-            out("\n" + "=" * 60)
-            out(f"# {e.title}  ({e.rel})")
-            if e.path.suffix == ".yaml":
-                out(e.path_abs.read_text(encoding="utf-8").strip())
-            else:
-                out((dump_frontmatter(e.meta) + "\n" + e.body).strip())
-    else:
-        bkey = KIND_BUDGET.get(args.kind or "", "default")
-        b = cfg["budgets"].get(bkey, {})
-        out(f"\n  预算[{bkey}]: {b.get('hint', '')}（目录≤{b.get('dirs', 2)}，全文≤{b.get('full', 5)}）")
 
 
 # ---------------------------------------------------------- 三级索引 + 路由三件套
@@ -538,7 +465,7 @@ def cmd_index(cfg, args):
         lines = [
             f"# {Path(prefix).name} — 域索引",
             "",
-            f"> 自动生成，勿手改；共 {len(es)} 条。刷新: `python scripts/infra.py index`",
+            f"> 自动生成，勿手改；共 {len(es)} 条。刷新: `python .knowhow/knowhow.py index`",
             "",
         ]
         lines += [e.line() for e in sorted(es, key=lambda x: x.rel)]
@@ -603,13 +530,13 @@ def cmd_index(cfg, args):
     (ROOT / cfg["paths"]["symptom_index"]).write_text("\n".join(s), encoding="utf-8")
 
     # 域路由表.yaml（agent 寻址入口）
-    r = ["# 自动生成（infra.py index），勿手改。agent 寻址优先查本表。",
+    r = ["# 自动生成（knowhow.py index），勿手改。agent 寻址优先查本表。",
          "domains:"]
     for key, dmeta in cfg["domains"].items():
         r.append(f"  {key}: {dmeta['path']}")
     (ROOT / cfg["paths"]["domain_routes"]).write_text("\n".join(r) + "\n",
                                                       encoding="utf-8")
-    out(f"[infra] 索引已刷新: {len(by_domain)} 个域, {total} 条 → "
+    out(f"[knowhow] 索引已刷新: {len(by_domain)} 个域, {total} 条 → "
         f"INDEX.md / {cfg['paths']['symptom_index']} / {cfg['paths']['domain_routes']}")
     append_log("index", os_user(), f"{total} entries")
 
@@ -670,7 +597,7 @@ def cmd_lint(cfg, args):
         n_md += 1
         meta, body = parse_frontmatter(f.read_text(encoding="utf-8"))
         if meta is None:
-            issues.append(f"{rel}: 缺少 frontmatter（用 `python scripts/infra.py new` 生成骨架）")
+            issues.append(f"{rel}: 缺少 frontmatter（用 `python .knowhow/knowhow.py new` 生成骨架）")
             continue
         e = Entry(f.relative_to(ROOT), meta, body)
         for key in ("title", "owner", "kind", "maturity"):
@@ -760,7 +687,7 @@ def cmd_lint(cfg, args):
                             if not (ROOT / str(lk)).exists():
                                 issues.append(f"{rel} {rn}: knowledge.{group} 指向不存在的 {lk}")
 
-    out(f"[infra] lint 完成: {n_md} 个 md + {len(manifest)} 个登记脚本 | "
+    out(f"[knowhow] lint 完成: {n_md} 个 md + {len(manifest)} 个登记脚本 | "
         f"错误 {len(issues)} | 警告 {len(warnings)}")
     for i in issues:
         out(f"  [E] {i}")
@@ -797,9 +724,9 @@ def cmd_decay(cfg, args):
             actions.append(f"[建议删除] {e.rel}: draft 且 {months} 月无引用"
                            f"（git rm 后提交，git 历史可恢复）")
     if not actions:
-        out("[infra] decay: 无需衰减的条目")
+        out("[knowhow] decay: 无需衰减的条目")
     else:
-        out(f"[infra] decay: {len(actions)} 项")
+        out(f"[knowhow] decay: {len(actions)} 项")
         for a_ in actions:
             out(f"  {a_}")
     append_log("decay", os_user(), f"{len(actions)} actions")
@@ -823,11 +750,11 @@ def cmd_reference(cfg, args):
     for raw in args.paths:
         rel = _resolve_entry(raw)
         if not rel:
-            out(f"[infra] 未找到 {raw}（路径相对仓库根，如 knowledge/06-存储/问题定位/xxx.md）")
+            out(f"[knowhow] 未找到 {raw}（路径相对仓库根，如 knowledge/06-存储/问题定位/xxx.md）")
             continue
         append_reference(rel, args.in_context)
         cnt = ref_index.get(rel, {}).get("count", 0) + 1
-        out(f"[infra] 已记引用: {rel}（累计 {cnt} 次，上下文: {args.in_context}）")
+        out(f"[knowhow] 已记引用: {rel}（累计 {cnt} 次，上下文: {args.in_context}）")
     append_log("reference", os_user(), " ".join(args.paths))
 
 
@@ -841,7 +768,7 @@ def cmd_verify(cfg, args):
         n = len(re.findall(r"(?m)^(\s*)last_reviewed:.*$", text))
         text = re.sub(r"(?m)^(\s*)last_reviewed:.*$", r"\1last_reviewed: " + today_str(), text)
         p.write_text(text, encoding="utf-8")
-        out(f"[infra] inventory 复审已记录: {rel}（{n} 条资源 last_reviewed={today_str()}）")
+        out(f"[knowhow] inventory 复审已记录: {rel}（{n} 条资源 last_reviewed={today_str()}）")
     else:
         meta, body = parse_frontmatter(p.read_text(encoding="utf-8"))
         if meta is None:
@@ -854,7 +781,7 @@ def cmd_verify(cfg, args):
             meta["maturity"] = "verified"
         meta["last_verified"] = today_str()
         p.write_text(dump_frontmatter(meta) + "\n" + body, encoding="utf-8")
-        out(f"[infra] 已验证: {rel} → {meta['maturity']}（last_verified={today_str()}）")
+        out(f"[knowhow] 已验证: {rel} → {meta['maturity']}（last_verified={today_str()}）")
     append_log("verify", os_user(), rel)
 
 
@@ -905,7 +832,7 @@ def cmd_new(cfg, args):
         text = dump_frontmatter(meta) + "\n" + body
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(text, encoding="utf-8")
-    out(f"[infra] 已生成: {dest.relative_to(ROOT).as_posix()}（maturity=draft）"
+    out(f"[knowhow] 已生成: {dest.relative_to(ROOT).as_posix()}（maturity=draft）"
         f"——补内容后跑 lint，git diff/commit 即评审")
     append_log("new", os_user(), dest.relative_to(ROOT).as_posix())
 
@@ -913,16 +840,10 @@ def cmd_new(cfg, args):
 # ---------------------------------------------------------- main
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="infra.py", description="基础设施知识库引擎（方案D域制）")
+    ap = argparse.ArgumentParser(prog="knowhow.py", description="知识库引擎（方案D域制）")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("index", help="生成索引三件套（INDEX/问题定位索引/域路由表）")
-
-    p_s = sub.add_parser("search", help="加权检索")
-    p_s.add_argument("query", nargs="+")
-    p_s.add_argument("--kind", help="registry/runbook/playbook/adr/faq/architecture/case/reference")
-    p_s.add_argument("--limit", type=int, default=5)
-    p_s.add_argument("--full", type=int, default=0, help="输出前 N 条全文")
 
     sub.add_parser("lint", help="结构/链接/manifest 治理")
 
@@ -945,7 +866,7 @@ def main(argv=None):
 
     args = ap.parse_args(argv)
     cfg = load_config()
-    {"index": cmd_index, "search": cmd_search, "lint": cmd_lint,
+    {"index": cmd_index, "lint": cmd_lint,
      "decay": cmd_decay, "reference": cmd_reference, "verify": cmd_verify,
      "new": cmd_new}[args.cmd](cfg, args)
 

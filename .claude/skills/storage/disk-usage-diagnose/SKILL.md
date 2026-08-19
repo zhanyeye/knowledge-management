@@ -30,7 +30,7 @@ description: 磁盘/inode 告警或写满时的只读诊断。输入目标主机
    - 未命中/未知大目录 → 报告路径+大小+属主线索，查 inventory 定位资源 owner
 4. 收尾两件事：
    - 结论写 `reports/YYYY-MM-磁盘诊断-<host>.md`
-   - `python scripts/infra.py reference knowledge/06-存储/问题定位/px公共文件服务器满.md --in "<简述>"`
+   - `python .knowhow/knowhow.py reference knowledge/06-存储/问题定位/px公共文件服务器满.md --in "<简述>"`
 
 ## 输出格式
 - `<host>` 磁盘画像（df -h / df -i，超阈值项加标）

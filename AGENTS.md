@@ -1,7 +1,7 @@
 # AGENTS.md — 基础设施知识库协作契约（方案D域制）
 
 本仓库 = 知识库（`knowledge/` 按域组织）+ 自动化脚本（`scripts/` + manifest 注册表）+ 技能层（`.claude/skills/`）。
-引擎 `scripts/infra.py`（纯标准库，零依赖）。适用于 Claude Code / ZCode / Cursor / 其他 CLI Agent。
+引擎 `.knowhow/knowhow.py`（纯标准库，零依赖）。适用于 Claude Code / ZCode / Cursor / 其他 CLI Agent。
 **本文件是唯一契约**，不要再建 .cursor/.claude 命令副本。
 
 ## 一、路由中枢（遇到问题先走这里）
@@ -9,21 +9,33 @@
 ```
 排障（"XX 出问题了/XX 症状"）：
   读 问题定位索引.md（症状→域→文档→脚本→skill）→ 有原子 skill 用 skill
-  → 无则读域内 问题定位/ 文档 → 仍无则 search/INDEX 逐级查 → 事后沉淀
+  → 无则 Grep `knowledge/**/问题定位/`（或 frontmatter `kind: playbook`）+ 症状词
+  → 仍无则读域 INDEX.md → 事后沉淀
 
 定位（"XX 在哪/谁负责/入口"）：
-  查 域路由表.yaml 定位域 → 读 knowledge/<域>/inventory.yaml
+  查 域路由表.yaml 定域 → Grep/读 knowledge/<域>/inventory.yaml
+  → 未命中再 Grep `knowledge/**/inventory.yaml`
 
 变更（"我要做 XX"）：
-  search --kind runbook / 域 INDEX → 完整读手册 → 按「三层闸门」执行
+  定域则读域 INDEX.md；Grep frontmatter `kind: runbook` + 动作词
+  → 确认一篇后完整读手册 → 按「三层闸门」执行
+  → Grep 仍无命中才视为没有手册（禁止把「没搜到」当成没有）
 
 入库（"把这份笔记/文档整理进库"）：
   infra-import 流程（见 skill）：分类 → new 生成 → 填内容（禁编造，缺项 TODO）→ lint
 ```
 
 索引三级：`INDEX.md`（总）→ `knowledge/<NN-域>/INDEX.md`（域）→ 条目全文。
-预算按任务类型在 `scripts/infra.json` → `budgets`。
-辅助：`python scripts/infra.py search <关键词> --limit 3`（标题/标签/H2/正文加权）。
+预算按任务类型在 `.knowhow/knowhow.json` → `budgets`（限制全文阅读篇数，不是检索 API）。
+
+**找知识用 Grep / 读索引，不要调用 knowhow.py search（已删除）。** kind 过滤靠目录约定和 frontmatter：
+
+| 要找 | Grep / 读哪里 |
+|---|---|
+| playbook | `knowledge/**/问题定位/`，或 `kind: playbook` |
+| runbook | `kind: runbook`（可再加动作关键词） |
+| registry | `knowledge/**/inventory.yaml` |
+| 症状路由 | 根目录 `问题定位索引.md`（由 playbook 的 `symptoms` 生成） |
 
 ## 二、什么放哪里（11 域 × 8 类）
 
@@ -43,11 +55,11 @@
 
 ## 三、写入规则（直接写目标位置，git 即评审）
 
-1. `python scripts/infra.py new <kind> <名> --domain <域键>` 生成骨架（maturity=draft）
+1. `python .knowhow/knowhow.py new <kind> <名> --domain <域键>` 生成骨架（maturity=draft）
 2. 套模板补内容；**禁止编造**：原始材料没有的信息写 `TODO`，不确定命令标 `待确认`
 3. playbook 标 `symptoms`（进问题定位索引）；配了脚本标 `script`（必须已登记 manifest）
 4. 涉及资源对象 → 同步 `inventory.yaml` 的 `knowledge.*` 链接（跨文件关联唯一源）
-5. `python scripts/infra.py lint` 零错误 → commit（git diff/PR 即人审）→ `index` 刷新索引
+5. `python .knowhow/knowhow.py lint` 零错误 → commit（git diff/PR 即人审）→ `index` 刷新索引
 
 ## 四、执行安全（三层闸门）
 
@@ -68,21 +80,22 @@ frontmatter 标 `automation`，INDEX.md 展示各域分布。不强求全 L3，�
 
 ## 六、治理
 
-- 成熟度：draft → verified（`infra.py verify <路径>`）→ proven（`--proven`，实战检验）
+- 成熟度：draft → verified（`python .knowhow/knowhow.py verify <路径>`）→ proven（`--proven`，实战检验）
 - 衰减：手册/排障 6 个月无引用/复审信号自动降级；draft 闲置由 decay 报「建议删除」（人工 git rm，历史可恢复）；资产清单走 last_reviewed 90 天告警
-- **命中并使用知识必须记引用**：`python scripts/infra.py reference <路径> --in "<上下文>"`
+- **命中并使用知识必须记引用**：`python .knowhow/knowhow.py reference <路径> --in "<上下文>"`
 - CI（.github/workflows/lint.yml）：lint + 单测，错误清零才能合入
 
 ## 七、命令与目录
 
 ```
-python scripts/infra.py {index,search,lint,decay,reference,verify,new}
+python .knowhow/knowhow.py {index,lint,decay,reference,verify,new}
 
 任务入口（.claude/skills/）：infra-locate / infra-change / infra-troubleshoot / infra-import
 斜杠命令（.claude/commands/，薄路由）：/infra 查询 · /infra-import 导入 · /infra-exec 执行
 原子技能（.claude/skills/<域>/<名>/）：如 storage/disk-usage-diagnose
 
 INDEX.md 总索引          问题定位索引.md 症状路由     域路由表.yaml agent寻址
-knowledge/ 知识库（11域） scripts/ 引擎+脚本+manifest  templates/ 模板
-reports/ 执行留痕        .infra/ 引用旁车+日志        .background/ .设计方案/ 设计资料
+knowledge/ 知识库（11域） scripts/ 运维脚本+manifest  templates/ 模板
+reports/ 执行留痕        .knowhow/ 知识引擎+引用旁车+日志
+.background/ .设计方案/ 设计资料
 ```

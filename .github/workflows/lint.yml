@@ -13,6 +13,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: 结构/链接/manifest 治理
-        run: python scripts/infra.py lint
+        run: python .knowhow/knowhow.py lint
       - name: 引擎单测
-        run: python scripts/test_infra.py
+        run: python .knowhow/test_knowhow.py

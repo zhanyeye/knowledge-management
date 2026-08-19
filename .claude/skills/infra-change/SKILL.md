@@ -9,12 +9,11 @@ description: 基础设施变更指引与执行。当用户说「我要做 XX」�
 
 ## 流程
 
-1. 找手册：
-   ```bash
-   python scripts/infra.py search <动作关键词> --kind runbook --limit 3
-   ```
-   （结果在 knowledge/<域>/，域名/证书类在 04-网络管理 对应子目录）
-2. **完整读目标手册全文**（预算 1 条，不截断），向用户复述：前置条件 → 步骤 → 验证 → 回滚。
+1. 找手册（**Grep / 读索引，不要用 knowhow.py 检索**）：
+   - 能定域 → 读 `knowledge/<域>/INDEX.md`
+   - Grep frontmatter `kind: runbook`，加上动作关键词（域名/证书/扩容…）
+   - 域名/证书类多在 `knowledge/04-网络管理/` 对应子目录
+2. 列出候选后**确认一篇**，完整读全文（预算 1 条，不截断），向用户复述：前置条件 → 步骤 → 验证 → 回滚。
 3. 涉及的资源先 `infra-locate` 查 inventory（环境/入口/负责人），避免在错误对象上操作。
 4. 执行（见三层闸门）。每步做完先验证再进下一步。
 5. 收尾：`reference <手册路径> --in "<变更内容>"`；手册有误/缺节 → 直接修订（lint 后提交）。
@@ -27,7 +26,9 @@ description: 基础设施变更指引与执行。当用户说「我要做 XX」�
 
 ## 没有手册时
 
+Grep 与域 INDEX 都未命中，才视为没有手册。不要把一次关键词落空当成库里没有。
+
 不要凭通用知识直接在生产上操作：
-1. 从用户/已有文档收集步骤，`python scripts/infra.py new runbook <名> --domain <域>` 落骨架；
+1. 从用户/已有文档收集步骤，`python .knowhow/knowhow.py new runbook <名> --domain <域>` 落骨架；
 2. 用户确认步骤无误后按闸门执行；
 3. 执行验证后 `verify` 升级，下次就有手册了。高频动作顺势 L1 化：步骤抽成脚本登记 manifest。

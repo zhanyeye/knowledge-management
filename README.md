@@ -30,14 +30,15 @@
 说明：
 - 不用命令直接说自然语言也行（skills 会按描述自动触发），命令只是显式入口
 - 前提是 Claude Code 在**本仓库目录**启动，才能读到 AGENTS.md 契约和 skills
-- 没有 agent 时：`python scripts/infra.py search 磁盘满` / `index` / `lint`
+- 没有 agent 时：读 `INDEX.md` / `问题定位索引.md`，或 `python .knowhow/knowhow.py lint` / `index`
 
 ## 目录
 
 | 位置 | 装什么 |
 |---|---|
 | `knowledge/00~10-域/` | 每域：`inventory.yaml` 资产清单 · 操作手册 · `问题定位/` 排障 · `复盘/` · `方案设计/` · `faq.md` |
-| `scripts/manifest.yaml` | **脚本注册表**：risk_level（readonly 可直跑 / change 走分级）+ 文档互链，未登记不许执行 |
+| `.knowhow/` | 知识引擎 `knowhow.py` + 配置 + 引用旁车/操作日志 |
+| `scripts/manifest.yaml` | **运维脚本注册表**：risk_level（readonly 可直跑 / change 走分级）+ 文档互链，未登记不许执行 |
 | `.claude/skills/` | 4 个任务入口（locate/change/troubleshoot/import）+ 域原子技能 |
 | `.claude/commands/` | 3 个斜杠命令：`/infra` `/infra-import` `/infra-exec`（薄路由，逻辑在 skills） |
 | `问题定位索引.md` | 症状 → 域 → 文档 → 脚本 → skill（自动生成） |
@@ -47,9 +48,9 @@
 ## 写入与治理
 
 ```
-python scripts/infra.py new runbook 域名申请 --domain network   # 直接生成到目标域
+python .knowhow/knowhow.py new runbook 域名申请 --domain network   # 直接生成到目标域
 （补内容：缺的信息写 TODO 禁止编造；playbook 标 symptoms）
-python scripts/infra.py lint        # 零错误后 commit，git diff 即评审
+python .knowhow/knowhow.py lint        # 零错误后 commit，git diff 即评审
 ```
 
 成熟度 draft→verified→proven；手册半年无引用自动降级；资产清单 90 天复审告警；

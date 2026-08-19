@@ -1,4 +1,4 @@
-# 自动生成（infra.py index），勿手改。agent 寻址优先查本表。
+# 自动生成（knowhow.py index），勿手改。agent 寻址优先查本表。
 domains:
   base: knowledge/00-通用环境基线
   image: knowledge/01-镜像制作
