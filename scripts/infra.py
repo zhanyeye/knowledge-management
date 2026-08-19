@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 KINDS = ("registry", "runbook", "playbook", "adr", "faq", "architecture", "case", "reference")
 KIND_DESC = {
-    "registry": "台账：inventory.yaml 资源事实卡",
+    "registry": "资产清单：inventory.yaml 资源事实卡",
     "runbook": "操作手册：这件事怎么做、怎么回滚",
     "playbook": "排障手册：这个症状怎么查（问题定位/）",
     "adr": "决策/方案记录：为什么这样设计（方案设计/）",
@@ -779,7 +779,7 @@ def cmd_decay(cfg, args):
     actions = []
     for e in load_md(cfg):
         if e.kind not in ("runbook", "playbook"):
-            continue  # 台账走 last_reviewed 告警；faq/adr/case/architecture/reference 豁免
+            continue  # 资产清单走 last_reviewed 告警；faq/adr/case/architecture/reference 豁免
         clock = e.anchor_clock(ref_index)
         if not clock:
             continue
@@ -869,7 +869,7 @@ def cmd_new(cfg, args):
     if args.kind == "registry":
         dest = ROOT / top / "inventory.yaml"
         if dest.exists():
-            die(f"已存在 {dest.relative_to(ROOT).as_posix()}（台账每域一份，直接编辑追加资源）")
+            die(f"已存在 {dest.relative_to(ROOT).as_posix()}（资产清单每域一份，直接编辑追加资源）")
     elif args.kind == "playbook":
         dest = ROOT / top / "问题定位" / f"{slug}.md"
     elif args.kind == "case":

@@ -1,0 +1,8 @@
+{"date": "2026-08-19", "ref": "INDEX.md", "context": "架构评估：骨架就绪度与后续使用风险", "actor": "Administrator"}
+{"date": "2026-08-19", "ref": "AGENTS.md", "context": "架构评估：骨架就绪度与后续使用风险", "actor": "Administrator"}
+{"date": "2026-08-19", "ref": "设计方案/方案D-合并版-知识Skill化与自动化.md", "context": "架构评估：骨架就绪度与后续使用风险", "actor": "Administrator"}
+{"date": "2026-08-19", "ref": "问题定位索引.md", "context": "架构评估：骨架就绪度与后续使用风险", "actor": "Administrator"}
+{"date": "2026-08-19", "ref": "AGENTS.md", "context": "梳理 skill/command/脚本能力与执行风险", "actor": "Administrator"}
+{"date": "2026-08-19", "ref": ".claude/skills/infra-change/SKILL.md", "context": "梳理 skill/command/脚本能力与执行风险", "actor": "Administrator"}
+{"date": "2026-08-19", "ref": ".claude/commands/infra-exec.md", "context": "梳理 skill/command/脚本能力与执行风险", "actor": "Administrator"}
+{"date": "2026-08-19", "ref": "scripts/manifest.yaml", "context": "梳理 skill/command/脚本能力与执行风险", "actor": "Administrator"}

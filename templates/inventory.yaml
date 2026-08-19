@@ -1,4 +1,4 @@
-# 域资源台账：一域一份（knowledge/<NN-域>/inventory.yaml），一文件多资源。
+# 域资产清单：一域一份（knowledge/<NN-域>/inventory.yaml），一文件多资源。
 # 只写「事实」：在哪/谁负责/入口/依赖；操作与决策分别放 runbook/adr。
 # lint 必填：resource_type/name/env/owner/entrypoints；last_reviewed 超 90 天告警。
 resources:

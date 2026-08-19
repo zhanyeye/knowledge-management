@@ -31,7 +31,7 @@
 
 | kind | 放哪 | 说明 |
 |---|---|---|
-| registry | `knowledge/<域>/inventory.yaml` | 每域一份多资源台账（在哪/谁负责/入口/依赖） |
+| registry | `knowledge/<域>/inventory.yaml` | 每域一份多资源资产清单（在哪/谁负责/入口/依赖） |
 | runbook | `knowledge/<域>/**`（含子目录） | 操作手册：怎么做/怎么回滚，带前置/验证/回滚 |
 | playbook | `knowledge/<域>/问题定位/` | 排障手册：按症状组织，标 `symptoms` 进症状索引 |
 | case | `knowledge/<域>/复盘/` | 故障/改进复盘 |
@@ -69,7 +69,7 @@ frontmatter 标 `automation`，INDEX.md 展示各域分布。不强求全 L3，�
 ## 六、治理
 
 - 成熟度：draft → verified（`infra.py verify <路径>`）→ proven（`--proven`，实战检验）
-- 衰减：手册/排障 6 个月无引用/复审信号自动降级；draft 闲置由 decay 报「建议删除」（人工 git rm，历史可恢复）；台账走 last_reviewed 90 天告警
+- 衰减：手册/排障 6 个月无引用/复审信号自动降级；draft 闲置由 decay 报「建议删除」（人工 git rm，历史可恢复）；资产清单走 last_reviewed 90 天告警
 - **命中并使用知识必须记引用**：`python scripts/infra.py reference <路径> --in "<上下文>"`
 - CI（.github/workflows/lint.yml）：lint + 单测，错误清零才能合入
 

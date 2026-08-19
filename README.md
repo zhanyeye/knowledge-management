@@ -36,7 +36,7 @@
 
 | 位置 | 装什么 |
 |---|---|
-| `knowledge/00~10-域/` | 每域：`inventory.yaml` 台账 · 操作手册 · `问题定位/` 排障 · `复盘/` · `方案设计/` · `faq.md` |
+| `knowledge/00~10-域/` | 每域：`inventory.yaml` 资产清单 · 操作手册 · `问题定位/` 排障 · `复盘/` · `方案设计/` · `faq.md` |
 | `scripts/manifest.yaml` | **脚本注册表**：risk_level（readonly 可直跑 / change 走分级）+ 文档互链，未登记不许执行 |
 | `.claude/skills/` | 4 个任务入口（locate/change/troubleshoot/import）+ 域原子技能 |
 | `.claude/commands/` | 3 个斜杠命令：`/infra` `/infra-import` `/infra-exec`（薄路由，逻辑在 skills） |
@@ -52,10 +52,10 @@ python scripts/infra.py new runbook 域名申请 --domain network   # 直接生�
 python scripts/infra.py lint        # 零错误后 commit，git diff 即评审
 ```
 
-成熟度 draft→verified→proven；手册半年无引用自动降级；台账 90 天复审告警；
+成熟度 draft→verified→proven；手册半年无引用自动降级；资产清单 90 天复审告警；
 引用用 `reference` 记录（衰减信号）。凭据/密码禁止入库。详见 [AGENTS.md](AGENTS.md)。
 
-## 首批建议补的台账
+## 首批建议补的资产清单
 
 知识手册导入后，优先补 inventory（消灭「TODO：入口」）：Rancher 集群 / px+viewpoint /
 ROMA / HIS / 云龙 / MinIO / 镜像仓 / ELK / Prometheus+Grafana / Jaeger+Pyroscope，
